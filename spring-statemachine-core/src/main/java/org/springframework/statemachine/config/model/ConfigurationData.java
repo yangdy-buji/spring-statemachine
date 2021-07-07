@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,17 +19,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.security.access.AccessDecisionManager;
+import org.springframework.statemachine.action.StateDoActionPolicy;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationBuilder;
 import org.springframework.statemachine.config.model.verifier.DefaultStateMachineModelVerifier;
 import org.springframework.statemachine.config.model.verifier.StateMachineModelVerifier;
 import org.springframework.statemachine.ensemble.StateMachineEnsemble;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.monitor.StateMachineMonitor;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.support.StateMachineInterceptor;
 import org.springframework.statemachine.transition.TransitionConflictPolicy;
@@ -46,10 +44,10 @@ public class ConfigurationData<S, E> {
 
 	private final String machineId;
 	private final BeanFactory beanFactory;
-	private final TaskExecutor taskExecutor;
-	private final TaskScheduler taskScheduler;
 	private final boolean autoStart;
 	private final TransitionConflictPolicy transitionConflictPolicy;
+	private final StateDoActionPolicy stateDoActionPolicy;
+	private final Long stateDoActionPolicyTimeout;
 	private final StateMachineEnsemble<S, E> ensemble;
 	private final List<StateMachineListener<S, E>> listeners;
 	private final boolean securityEnabled;
@@ -61,21 +59,20 @@ public class ConfigurationData<S, E> {
 	private final SecurityRule transitionSecurityRule;
 	private final StateMachineMonitor<S, E> stateMachineMonitor;
 	private final List<StateMachineInterceptor<S, E>> interceptors;
+	private final RegionExecutionPolicy regionExecutionPolicy;
 
 	/**
 	 * Instantiates a new state machine configuration config data.
 	 */
 	public ConfigurationData() {
-		this(null, new SyncTaskExecutor(), new ConcurrentTaskScheduler(), false, null, new ArrayList<StateMachineListener<S, E>>(), false,
-				null, null, null, null, true, new DefaultStateMachineModelVerifier<S, E>(), null, null, null);
+		this(null, false, null, new ArrayList<StateMachineListener<S, E>>(), false, null, null, null, null, true,
+				new DefaultStateMachineModelVerifier<S, E>(), null, null, null);
 	}
 
 	/**
 	 * Instantiates a new state machine configuration config data.
 	 *
 	 * @param beanFactory the bean factory
-	 * @param taskExecutor the task executor
-	 * @param taskScheduler the task scheduler
 	 * @param autoStart the autostart flag
 	 * @param ensemble the state machine ensemble
 	 * @param listeners the state machine listeners
@@ -90,24 +87,22 @@ public class ConfigurationData<S, E> {
 	 * @param stateMachineMonitor the state machine monitor
 	 * @param interceptors the state machine interceptors.
 	 */
-	public ConfigurationData(BeanFactory beanFactory, TaskExecutor taskExecutor,
-			TaskScheduler taskScheduler, boolean autoStart, StateMachineEnsemble<S, E> ensemble,
+	public ConfigurationData(BeanFactory beanFactory, boolean autoStart, StateMachineEnsemble<S, E> ensemble,
 			List<StateMachineListener<S, E>> listeners, boolean securityEnabled,
-			AccessDecisionManager transitionSecurityAccessDecisionManager, AccessDecisionManager eventSecurityAccessDecisionManager,
-			SecurityRule eventSecurityRule, SecurityRule transitionSecurityRule, boolean verifierEnabled,
-			StateMachineModelVerifier<S, E> verifier, String machineId, StateMachineMonitor<S, E> stateMachineMonitor,
+			AccessDecisionManager transitionSecurityAccessDecisionManager,
+			AccessDecisionManager eventSecurityAccessDecisionManager, SecurityRule eventSecurityRule,
+			SecurityRule transitionSecurityRule, boolean verifierEnabled, StateMachineModelVerifier<S, E> verifier,
+			String machineId, StateMachineMonitor<S, E> stateMachineMonitor,
 			List<StateMachineInterceptor<S, E>> interceptors) {
-		this(beanFactory, taskExecutor, taskScheduler, autoStart, ensemble, listeners, securityEnabled,
-				transitionSecurityAccessDecisionManager, eventSecurityAccessDecisionManager, eventSecurityRule, transitionSecurityRule,
-				verifierEnabled, verifier, machineId, stateMachineMonitor, interceptors, null);
+		this(beanFactory, autoStart, ensemble, listeners, securityEnabled, transitionSecurityAccessDecisionManager,
+				eventSecurityAccessDecisionManager, eventSecurityRule, transitionSecurityRule, verifierEnabled,
+				verifier, machineId, stateMachineMonitor, interceptors, null, null, null, null);
 	}
 
 	/**
 	 * Instantiates a new state machine configuration config data.
 	 *
 	 * @param beanFactory the bean factory
-	 * @param taskExecutor the task executor
-	 * @param taskScheduler the task scheduler
 	 * @param autoStart the autostart flag
 	 * @param ensemble the state machine ensemble
 	 * @param listeners the state machine listeners
@@ -122,17 +117,20 @@ public class ConfigurationData<S, E> {
 	 * @param stateMachineMonitor the state machine monitor
 	 * @param interceptors the state machine interceptors.
 	 * @param transitionConflightPolicy the transition conflict policy
+	 * @param stateDoActionPolicy the state do action policy
+	 * @param stateDoActionPolicyTimeout the state do action policy timeout
+	 * @param regionExecutionPolicy the region execution policy
 	 */
-	public ConfigurationData(BeanFactory beanFactory, TaskExecutor taskExecutor,
-			TaskScheduler taskScheduler, boolean autoStart, StateMachineEnsemble<S, E> ensemble,
+	public ConfigurationData(BeanFactory beanFactory, boolean autoStart, StateMachineEnsemble<S, E> ensemble,
 			List<StateMachineListener<S, E>> listeners, boolean securityEnabled,
-			AccessDecisionManager transitionSecurityAccessDecisionManager, AccessDecisionManager eventSecurityAccessDecisionManager,
-			SecurityRule eventSecurityRule, SecurityRule transitionSecurityRule, boolean verifierEnabled,
-			StateMachineModelVerifier<S, E> verifier, String machineId, StateMachineMonitor<S, E> stateMachineMonitor,
-			List<StateMachineInterceptor<S, E>> interceptors, TransitionConflictPolicy transitionConflightPolicy) {
+			AccessDecisionManager transitionSecurityAccessDecisionManager,
+			AccessDecisionManager eventSecurityAccessDecisionManager, SecurityRule eventSecurityRule,
+			SecurityRule transitionSecurityRule, boolean verifierEnabled, StateMachineModelVerifier<S, E> verifier,
+			String machineId, StateMachineMonitor<S, E> stateMachineMonitor,
+			List<StateMachineInterceptor<S, E>> interceptors, TransitionConflictPolicy transitionConflightPolicy,
+			StateDoActionPolicy stateDoActionPolicy, Long stateDoActionPolicyTimeout,
+			RegionExecutionPolicy regionExecutionPolicy) {
 		this.beanFactory = beanFactory;
-		this.taskExecutor = taskExecutor;
-		this.taskScheduler = taskScheduler;
 		this.autoStart = autoStart;
 		this.ensemble = ensemble;
 		this.listeners = listeners;
@@ -147,6 +145,9 @@ public class ConfigurationData<S, E> {
 		this.stateMachineMonitor = stateMachineMonitor;
 		this.interceptors = interceptors;
 		this.transitionConflictPolicy = transitionConflightPolicy;
+		this.stateDoActionPolicy = stateDoActionPolicy;
+		this.stateDoActionPolicyTimeout = stateDoActionPolicyTimeout;
+		this.regionExecutionPolicy = regionExecutionPolicy;
 	}
 
 	public String getMachineId() {
@@ -160,24 +161,6 @@ public class ConfigurationData<S, E> {
 	 */
 	public BeanFactory getBeanFactory() {
 		return beanFactory;
-	}
-
-	/**
-	 * Gets the task executor.
-	 *
-	 * @return the task executor
-	 */
-	public TaskExecutor getTaskExecutor() {
-		return taskExecutor;
-	}
-
-	/**
-	 * Gets the task scheduler.
-	 *
-	 * @return the task scheduler
-	 */
-	public TaskScheduler getTaskScheduler() {
-		return taskScheduler;
 	}
 
 	/**
@@ -295,5 +278,32 @@ public class ConfigurationData<S, E> {
 	 */
 	public TransitionConflictPolicy getTransitionConflictPolicy() {
 		return transitionConflictPolicy;
+	}
+
+	/**
+	 * Gets the state do action policy.
+	 *
+	 * @return the state do action policy
+	 */
+	public StateDoActionPolicy getStateDoActionPolicy() {
+		return stateDoActionPolicy;
+	}
+
+	/**
+	 * Gets the state do action policy timeout.
+	 *
+	 * @return the state do action policy timeout
+	 */
+	public Long getStateDoActionPolicyTimeout() {
+		return stateDoActionPolicyTimeout;
+	}
+
+	/**
+	 * Gets the region execution policy.
+	 *
+	 * @return the region execution policy
+	 */
+	public RegionExecutionPolicy getRegionExecutionPolicy() {
+		return regionExecutionPolicy;
 	}
 }

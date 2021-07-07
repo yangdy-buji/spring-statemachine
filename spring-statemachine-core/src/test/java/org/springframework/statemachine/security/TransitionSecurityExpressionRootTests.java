@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,14 @@
  */
 package org.springframework.statemachine.security;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -43,7 +42,7 @@ public class TransitionSecurityExpressionRootTests {
 	private Authentication user;
 	private Transition<?, ?> transition;
 
-	@Before
+	@BeforeEach
 	public void createContext() {
 		user = mock(Authentication.class);
 		transition = mock(Transition.class);
@@ -67,28 +66,28 @@ public class TransitionSecurityExpressionRootTests {
 		when(transition.getTarget()).thenReturn(target);
 
 		Expression e1 = parser.parseExpression("hasSource('S1')");
-		assertTrue(ExpressionUtils.evaluateAsBoolean(e1, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e1, ctx)).isTrue();
 		Expression e2 = parser.parseExpression("hasTarget('S2')");
-		assertTrue(ExpressionUtils.evaluateAsBoolean(e2, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e2, ctx)).isTrue();
 	}
 
 	@Test
 	public void canCallMethodsOnVariables() throws Exception {
 		ctx.setVariable("var", "somestring");
 		Expression e = parser.parseExpression("#var.length() == 10");
-		assertTrue(ExpressionUtils.evaluateAsBoolean(e, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e, ctx)).isTrue();
 	}
 
 	@Test
 	public void isAnonymousReturnsTrueIfTrustResolverReportsAnonymous() {
 		when(trustResolver.isAnonymous(user)).thenReturn(true);
-		assertTrue(root.isAnonymous());
+		assertThat(root.isAnonymous()).isTrue();
 	}
 
 	@Test
 	public void isAnonymousReturnsFalseIfTrustResolverReportsNonAnonymous() {
 		when(trustResolver.isAnonymous(user)).thenReturn(false);
-		assertFalse(root.isAnonymous());
+		assertThat(root.isAnonymous()).isFalse();
 	}
 
 	@Test
@@ -98,7 +97,7 @@ public class TransitionSecurityExpressionRootTests {
 		ctx.setVariable("domainObject", dummyDomainObject);
 		root.setPermissionEvaluator(pe);
 		when(pe.hasPermission(user, dummyDomainObject, "ignored")).thenReturn(false);
-		assertFalse(root.hasPermission(dummyDomainObject, "ignored"));
+		assertThat(root.hasPermission(dummyDomainObject, "ignored")).isFalse();
 	}
 
 	@Test
@@ -108,7 +107,7 @@ public class TransitionSecurityExpressionRootTests {
 		ctx.setVariable("domainObject", dummyDomainObject);
 		root.setPermissionEvaluator(pe);
 		when(pe.hasPermission(user, dummyDomainObject, "ignored")).thenReturn(true);
-		assertTrue(root.hasPermission(dummyDomainObject, "ignored"));
+		assertThat(root.hasPermission(dummyDomainObject, "ignored")).isTrue();
 	}
 
 	@Test
@@ -121,13 +120,13 @@ public class TransitionSecurityExpressionRootTests {
 
 		Expression e = parser.parseExpression("hasPermission(#domainObject, 0xA)");
 		// evaluator returns true
-		assertTrue(ExpressionUtils.evaluateAsBoolean(e, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e, ctx)).isTrue();
 		e = parser.parseExpression("hasPermission(#domainObject, 10)");
 		// evaluator returns true
-		assertTrue(ExpressionUtils.evaluateAsBoolean(e, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e, ctx)).isTrue();
 		e = parser.parseExpression("hasPermission(#domainObject, 0xFF)");
 		// evaluator returns false, make sure return value matches
-		assertFalse(ExpressionUtils.evaluateAsBoolean(e, ctx));
+		assertThat(ExpressionUtils.evaluateAsBoolean(e, ctx)).isFalse();
 	}
 
 }

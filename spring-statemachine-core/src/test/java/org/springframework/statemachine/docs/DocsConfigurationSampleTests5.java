@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,14 @@
  */
 package org.springframework.statemachine.docs;
 
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashMap;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
@@ -33,6 +33,8 @@ import org.springframework.statemachine.config.builders.StateMachineStateConfigu
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.persist.DefaultStateMachinePersister;
 import org.springframework.statemachine.persist.StateMachinePersister;
+
+import reactor.core.publisher.Mono;
 
 public class DocsConfigurationSampleTests5 extends AbstractStateMachineTests {
 
@@ -54,14 +56,17 @@ public class DocsConfigurationSampleTests5 extends AbstractStateMachineTests {
 
 		StateMachine<String, String> stateMachine1 = context.getBean("machine1", StateMachine.class);
 		StateMachine<String, String> stateMachine2 = context.getBean("machine2", StateMachine.class);
-		stateMachine1.start();
+		stateMachine1.startReactively().block();
 
-		stateMachine1.sendEvent("E1");
-		assertThat(stateMachine1.getState().getIds(), contains("S2"));
+		stateMachine1
+			.sendEvent(Mono.just(MessageBuilder
+				.withPayload("E1").build()))
+			.blockLast();
+		assertThat(stateMachine1.getState().getIds()).containsExactly("S2");
 
 		persister.persist(stateMachine1, "myid");
 		persister.restore(stateMachine2, "myid");
-		assertThat(stateMachine2.getState().getIds(), contains("S2"));
+		assertThat(stateMachine2.getState().getIds()).containsExactly("S2");
 // end::snippetC[]
 	}
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,16 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
@@ -49,12 +42,12 @@ public abstract class AbstractStateMachineTests {
 
 	protected AnnotationConfigApplicationContext context;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		context = buildContext();
 	}
 
-	@After
+	@AfterEach
 	public void clean() {
 		if (context != null) {
 			context.close();
@@ -68,13 +61,13 @@ public abstract class AbstractStateMachineTests {
 	public enum TestStates {
 		SI,S1,S2,S3,S4,SF,SH,
 		S10,S11,S101,S111,S112,S12,S121,S122,S13,
-		S20,S21,S201,S211,S212,
+		S20,S21,S22,S201,S211,S212,
 		S1011,S1012,S2011,S2012,
 		S30,S31,S32,S33
 	}
 
 	public enum TestEvents {
-		E1,E2,E3,E4,EF,EH
+		E1,E2,E3,E4,E5,EF,EH
 	}
 
 	public static enum TestStates2 {
@@ -96,38 +89,6 @@ public abstract class AbstractStateMachineTests {
 
 	public static enum TestEvents2 {
 		PLAY, STOP, PAUSE, EJECT, LOAD
-	}
-
-	@Configuration
-	public static class BaseConfig {
-
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
-		@Bean
-		public TaskScheduler taskScheduler() {
-			return new ConcurrentTaskScheduler();
-		}
-
-	}
-
-	@Configuration
-	public static class BaseConfig2 {
-
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-			taskExecutor.setCorePoolSize(5);
-			return taskExecutor;
-		}
-
-		@Bean
-		public TaskScheduler taskScheduler() {
-			return new ConcurrentTaskScheduler();
-		}
-
 	}
 
 	public static class TestEntryAction extends AbstractTestAction {

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,8 +24,6 @@ import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.region.Region;
 import org.springframework.statemachine.state.AbstractState;
 import org.springframework.statemachine.state.HistoryPseudoState;
@@ -68,15 +66,9 @@ public abstract class AbstractStateMachinePersister<S, E, T> implements StateMac
 	@Override
 	public final StateMachine<S, E> restore(StateMachine<S, E> stateMachine, T contextObj) throws Exception {
 		final StateMachineContext<S, E> context = stateMachinePersist.read(contextObj);
-		stateMachine.stop();
-		stateMachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<S, E>>() {
-
-			@Override
-			public void apply(StateMachineAccess<S, E> function) {
-				function.resetStateMachine(context);
-			}
-		});
-		stateMachine.start();
+		stateMachine.stopReactively().block();
+		stateMachine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(context));
+		stateMachine.startReactively().block();
 		return stateMachine;
 	}
 
@@ -88,7 +80,9 @@ public abstract class AbstractStateMachinePersister<S, E, T> implements StateMac
 		S id = null;
 		State<S, E> state = stateMachine.getState();
 		if (state.isSubmachineState()) {
-			id = getDeepState(state);
+			StateMachine<S, E> submachine = ((AbstractState<S, E>) state).getSubmachine();
+			id = submachine.getState().getId();
+			childs.add(buildStateMachineContext(submachine));
 		} else if (state.isOrthogonal()) {
 			Collection<Region<S, E>> regions = ((AbstractState<S, E>)state).getRegions();
 			for (Region<S, E> r : regions) {
@@ -103,8 +97,8 @@ public abstract class AbstractStateMachinePersister<S, E, T> implements StateMac
 		// building history state mappings
 		Map<S, S> historyStates = new HashMap<S, S>();
 		PseudoState<S, E> historyState = ((AbstractStateMachine<S, E>) stateMachine).getHistoryState();
-		if (historyState != null) {
-			historyStates.put(null, ((HistoryPseudoState<S, E>)historyState).getState().getId());
+		if (historyState != null && ((HistoryPseudoState<S, E>)historyState).getState() != null) {
+			historyStates.put(null, ((HistoryPseudoState<S, E>) historyState).getState().getId());
 		}
 		Collection<State<S, E>> states = stateMachine.getStates();
 		for (State<S, E> ss : states) {
@@ -120,13 +114,5 @@ public abstract class AbstractStateMachinePersister<S, E, T> implements StateMac
 			}
 		}
 		return new DefaultStateMachineContext<S, E>(childs, id, null, null, extendedState, historyStates, stateMachine.getId());
-	}
-
-	private S getDeepState(State<S, E> state) {
-		Collection<S> ids1 = state.getIds();
-		@SuppressWarnings("unchecked")
-		S[] ids2 = (S[]) ids1.toArray();
-		// TODO: can this be empty as then we'd get error?
-		return ids2[ids2.length-1];
 	}
 }

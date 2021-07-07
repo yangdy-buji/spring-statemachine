@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,10 @@
  */
 package org.springframework.statemachine.config.common.annotation;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
@@ -35,10 +31,10 @@ import org.springframework.statemachine.config.common.annotation.simple.SimpleTe
 import org.springframework.statemachine.config.common.annotation.simple.SimpleTestConfigBuilder;
 import org.springframework.statemachine.config.common.annotation.simple.SimpleTestConfigurerAdapter;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.support.AnnotationConfigContextLoader;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(loader=AnnotationConfigContextLoader.class)
 public class MixedAnnotationConfigurationTests {
 
@@ -47,27 +43,26 @@ public class MixedAnnotationConfigurationTests {
 
 	@Test
 	public void testConfig() throws Exception {
-		assertNotNull(ctx);
-		assertTrue(ctx.containsBean("simpleConfig"));
+		assertThat(ctx.containsBean("simpleConfig")).isTrue();
 		SimpleTestConfig simpleConfig = ctx.getBean("simpleConfig", SimpleTestConfig.class);
-		assertThat(simpleConfig.simpleData, notNullValue());
-		assertThat(simpleConfig.simpleData, is("simpleData"));
+		assertThat(simpleConfig.simpleData).isNotNull();
+		assertThat(simpleConfig.simpleData).isEqualTo("simpleData");
 
-		assertThat(simpleConfig.simpleProperties, notNullValue());
-		assertThat(simpleConfig.simpleProperties.getProperty("simpleKey1"), notNullValue());
-		assertThat(simpleConfig.simpleProperties.getProperty("simpleKey1"), is("simpleValue1"));
+		assertThat(simpleConfig.simpleProperties).isNotNull();
+		assertThat(simpleConfig.simpleProperties.getProperty("simpleKey1")).isNotNull();
+		assertThat(simpleConfig.simpleProperties.getProperty("simpleKey1")).isEqualTo("simpleValue1");
 
-		assertTrue(ctx.containsBean("complexConfig"));
+		assertThat(ctx.containsBean("complexConfig")).isTrue();
 		ComplexTestConfig complexConfig = ctx.getBean("complexConfig", ComplexTestConfig.class);
-		assertThat(complexConfig.complexData, notNullValue());
-		assertThat(complexConfig.complexData, is("complexData"));
-		assertThat(complexConfig.complexProperties, notNullValue());
-		assertThat(complexConfig.complexProperties.getProperty("complexKey1"), notNullValue());
-		assertThat(complexConfig.complexProperties.getProperty("complexKey1"), is("complexValue1"));
+		assertThat(complexConfig.complexData).isNotNull();
+		assertThat(complexConfig.complexData).isEqualTo("complexData");
+		assertThat(complexConfig.complexProperties).isNotNull();
+		assertThat(complexConfig.complexProperties.getProperty("complexKey1")).isNotNull();
+		assertThat(complexConfig.complexProperties.getProperty("complexKey1")).isEqualTo("complexValue1");
 
-		assertThat(complexConfig.simpleTestConfig, notNullValue());
-		assertThat(complexConfig.simpleTestConfig.simpleData, notNullValue());
-		assertThat(complexConfig.simpleTestConfig.simpleData, is("simpleData"));
+		assertThat(complexConfig.simpleTestConfig).isNotNull();
+		assertThat(complexConfig.simpleTestConfig.simpleData).isNotNull();
+		assertThat(complexConfig.simpleTestConfig.simpleData).isEqualTo("simpleData");
 
 	}
 

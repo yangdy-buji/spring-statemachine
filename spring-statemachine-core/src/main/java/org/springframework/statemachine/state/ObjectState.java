@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,17 @@
 package org.springframework.statemachine.state;
 
 import java.util.Collection;
+import java.util.function.Function;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.region.Region;
+import org.springframework.statemachine.support.StateMachineUtils;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * A {@link State} implementation where state and event is object based.
@@ -73,7 +77,8 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 	 * @param entryActions the entry actions
 	 * @param exitActions the exit actions
 	 */
-	public ObjectState(S id, Collection<E> deferred, Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions) {
+	public ObjectState(S id, Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions) {
 		super(id, deferred, entryActions, exitActions);
 	}
 
@@ -86,8 +91,8 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 	 * @param exitActions the exit actions
 	 * @param pseudoState the pseudo state
 	 */
-	public ObjectState(S id, Collection<E> deferred, Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions,
-			PseudoState<S, E> pseudoState) {
+	public ObjectState(S id, Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions, PseudoState<S, E> pseudoState) {
 		super(id, deferred, entryActions, exitActions, pseudoState);
 	}
 
@@ -101,8 +106,9 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 	 * @param pseudoState the pseudo state
 	 * @param regions the regions
 	 */
-	public ObjectState(S id, Collection<E> deferred, Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions,
-			PseudoState<S, E> pseudoState, Collection<Region<S, E>> regions) {
+	public ObjectState(S id, Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions, PseudoState<S, E> pseudoState,
+			Collection<Region<S, E>> regions) {
 		super(id, deferred, entryActions, exitActions, pseudoState, regions);
 	}
 
@@ -116,8 +122,9 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 	 * @param pseudoState the pseudo state
 	 * @param submachine the submachine
 	 */
-	public ObjectState(S id, Collection<E> deferred, Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions,
-			PseudoState<S, E> pseudoState, StateMachine<S, E> submachine) {
+	public ObjectState(S id, Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions, PseudoState<S, E> pseudoState,
+			StateMachine<S, E> submachine) {
 		super(id, deferred, entryActions, exitActions, pseudoState, submachine);
 	}
 
@@ -133,34 +140,35 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 	 * @param regions the regions
 	 * @param submachine the submachine
 	 */
-	public ObjectState(S id, Collection<E> deferred, Collection<? extends Action<S, E>> entryActions,
-			Collection<? extends Action<S, E>> exitActions, Collection<? extends Action<S, E>> stateActions,
-			PseudoState<S, E> pseudoState, Collection<Region<S, E>> regions, StateMachine<S, E> submachine) {
+	public ObjectState(S id, Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> stateActions, PseudoState<S, E> pseudoState,
+			Collection<Region<S, E>> regions, StateMachine<S, E> submachine) {
 		super(id, deferred, entryActions, exitActions, stateActions, pseudoState, regions, submachine);
 	}
 
 	@Override
-	public void exit(StateContext<S, E> context) {
-		super.exit(context);
-		for (Action<S, E> action : getExitActions()) {
-			try {
-				executeAction(action, context);
-			} catch (Exception e) {
-				log.error("Action execution resulted error", e);
-			}
-		}
+	public Mono<Void> exit(StateContext<S, E> context) {
+		Mono<Void> actions = Flux.fromIterable(getExitActions())
+			.flatMap(a -> executeAction(a, context)
+				.doOnError(e -> {
+					log.warn("Exit action execution error", e);
+				}))
+			.onErrorResume(StateMachineUtils.resumeErrorToContext())
+			.then();
+		return super.exit(context).and(actions);
 	}
 
 	@Override
-	public void entry(StateContext<S, E> context) {
-		for (Action<S, E> action : getEntryActions()) {
-			try {
-				executeAction(action, context);
-			} catch (Exception e) {
-				log.error("Action execution resulted error", e);
-			}
-		}
-		super.entry(context);
+	public Mono<Void> entry(StateContext<S, E> context) {
+		Mono<Void> actions =  Flux.fromIterable(getEntryActions())
+			.flatMap(a -> executeAction(a, context)
+				.doOnError(e -> {
+					log.warn("Entry action execution error", e);
+				}))
+			.onErrorResume(StateMachineUtils.resumeErrorToContext())
+			.then();
+		return actions.and(super.entry(context));
 	}
 
 	@Override
@@ -168,5 +176,4 @@ public class ObjectState<S, E> extends AbstractSimpleState<S, E> {
 		return "ObjectState [getIds()=" + getIds() + ", getClass()=" + getClass() + ", hashCode()=" + hashCode()
 				+ ", toString()=" + super.toString() + "]";
 	}
-
 }

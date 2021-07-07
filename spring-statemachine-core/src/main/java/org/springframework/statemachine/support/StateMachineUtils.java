@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,19 @@ package org.springframework.statemachine.support;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Optional;
+import java.util.function.Function;
 
+import org.springframework.statemachine.StateContext;
+import org.springframework.statemachine.StateMachineMessageHeaders;
+import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.state.PseudoState;
 import org.springframework.statemachine.state.PseudoStateKind;
 import org.springframework.statemachine.state.State;
+import org.springframework.statemachine.support.StateMachineExecutor.ExecutorExceptionHolder;
 import org.springframework.util.ObjectUtils;
+
+import reactor.core.publisher.Mono;
 
 /**
  * Various utility methods for state machine.
@@ -170,4 +178,39 @@ public abstract class StateMachineUtils {
 		return false;
 	}
 
+	/**
+	 * Gets a particular message header from a {@link StateContext} and parses
+	 * it to {@code Long}. Any error parsing header results {@code NULL}.
+	 *
+	 * @param <S> the type of state
+	 * @param <E> the type of event
+	 * @param context the state context
+	 * @return the header as {@code Long} or {@code NULL}
+	 */
+	public static <S, E> Long getMessageHeaderDoActionTimeout(StateContext<S, E> context) {
+		try {
+			Number number = context.getMessageHeaders().get(StateMachineMessageHeaders.HEADER_DO_ACTION_TIMEOUT, Number.class);
+			if (number != null) {
+				return number.longValue();
+			}
+		} catch (Exception e) {
+		}
+		return null;
+	}
+
+	/**
+	 * Utility function to stash error into reactor context.
+	 *
+	 * @return mono for completion
+	 */
+	public static Function<? super Throwable, Mono<Void>> resumeErrorToContext() {
+		return t -> Mono.deferContextual(Mono::just)
+			.doOnNext(ctx -> {
+				Optional<ExecutorExceptionHolder> holder = ctx.getOrEmpty(StateMachineSystemConstants.REACTOR_CONTEXT_ERRORS);
+				holder.ifPresent(h -> {
+					h.setError(t);
+				});
+			})
+			.then();
+	}
 }

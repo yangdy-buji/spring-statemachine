@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2018 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,19 @@
  */
 package org.springframework.statemachine.data.jpa;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -59,24 +63,24 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		JpaStateRepository statesRepository = context.getBean(JpaStateRepository.class);
 		JpaRepositoryState stateS1 = new JpaRepositoryState("S1");
 		JpaRepositoryState stateS2 = new JpaRepositoryState("S2");
-		assertThat(statesRepository.count(), is(0l));
+		assertThat(statesRepository.count()).isEqualTo(0l);
 
 		statesRepository.save(stateS1);
 		statesRepository.save(stateS2);
-		assertThat(statesRepository.count(), is(2l));
+		assertThat(statesRepository.count()).isEqualTo(2l);
 
 		JpaTransitionRepository transitionsRepository = context.getBean(JpaTransitionRepository.class);
 		JpaRepositoryTransition transition = new JpaRepositoryTransition(stateS1, stateS2, "E1");
 		transition.setKind(TransitionKind.EXTERNAL);
 		transitionsRepository.save(transition);
 
-		assertThat(statesRepository.count(), is(2l));
+		assertThat(statesRepository.count()).isEqualTo(2l);
 
 		JpaRepositoryTransition transition2 = transitionsRepository.findAll().iterator().next();
-		assertThat(transition2.getSource().getState(), is("S1"));
-		assertThat(transition2.getTarget().getState(), is("S2"));
-		assertThat(transition2.getEvent(), is("E1"));
-		assertThat(transition2.getKind(), is(TransitionKind.EXTERNAL));
+		assertThat(transition2.getSource().getState()).isEqualTo("S1");
+		assertThat(transition2.getTarget().getState()).isEqualTo("S2");
+		assertThat(transition2.getEvent()).isEqualTo("E1");
+		assertThat(transition2.getKind()).isEqualTo(TransitionKind.EXTERNAL);
 
 		context.close();
 	}
@@ -95,16 +99,16 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		@SuppressWarnings("unchecked")
 		StateRepository<? extends RepositoryState> statesRepository2 = context.getBean(StateRepository.class);
 		Iterable<? extends RepositoryState> findAll = statesRepository2.findAll();
-		assertThat(findAll.iterator().next().getState(), is("S1"));
+		assertThat(findAll.iterator().next().getState()).isEqualTo("S1");
 
 		@SuppressWarnings("unchecked")
 		TransitionRepository<RepositoryTransition> transitionsRepository = context.getBean(TransitionRepository.class);
 		RepositoryTransition transition = new JpaRepositoryTransition(state1, state2, "E1");
 		transitionsRepository.save(transition);
 		RepositoryTransition transition2 = transitionsRepository.findAll().iterator().next();
-		assertThat(transition2.getSource().getState(), is("S1"));
-		assertThat(transition2.getTarget().getState(), is("S2"));
-		assertThat(transition2.getEvent(), is("E1"));
+		assertThat(transition2.getSource().getState()).isEqualTo("S1");
+		assertThat(transition2.getTarget().getState()).isEqualTo("S2");
+		assertThat(transition2.getEvent()).isEqualTo("E1");
 
 		context.close();
 	}
@@ -126,10 +130,10 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 
 		List<JpaRepositoryState> findByMachineId1 = statesRepository.findByMachineId("machine1");
 		List<JpaRepositoryState> findByMachineId2 = statesRepository.findByMachineId("machine2");
-		assertThat(findByMachineId1.size(), is(2));
-		assertThat(findByMachineId2.size(), is(2));
-		assertThat(findByMachineId1.get(0).getMachineId(), is("machine1"));
-		assertThat(findByMachineId2.get(0).getMachineId(), is("machine2"));
+		assertThat(findByMachineId1).hasSize(2);
+		assertThat(findByMachineId2).hasSize(2);
+		assertThat(findByMachineId1.get(0).getMachineId()).isEqualTo("machine1");
+		assertThat(findByMachineId2.get(0).getMachineId()).isEqualTo("machine2");
 
 
 		JpaTransitionRepository transitionsRepository = context.getBean(JpaTransitionRepository.class);
@@ -140,10 +144,10 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		List<JpaRepositoryTransition> findByMachineId3 = transitionsRepository.findByMachineId("machine1");
 		List<JpaRepositoryTransition> findByMachineId4 = transitionsRepository.findByMachineId("machine2");
 
-		assertThat(findByMachineId3.size(), is(1));
-		assertThat(findByMachineId4.size(), is(1));
-		assertThat(findByMachineId3.get(0).getMachineId(), is("machine1"));
-		assertThat(findByMachineId4.get(0).getMachineId(), is("machine2"));
+		assertThat(findByMachineId3).hasSize(1);
+		assertThat(findByMachineId4).hasSize(1);
+		assertThat(findByMachineId3.get(0).getMachineId()).isEqualTo("machine1");
+		assertThat(findByMachineId4.get(0).getMachineId()).isEqualTo("machine2");
 
 		context.close();
 	}
@@ -159,10 +163,10 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		action1.setName("action1");
 		actionsRepository.save(action1);
 
-		assertThat(actionsRepository.count(), is(1l));
+		assertThat(actionsRepository.count()).isEqualTo(1l);
 		JpaRepositoryAction action11 = actionsRepository.findAll().iterator().next();
-		assertThat(action1.getSpel(), is(action11.getSpel()));
-		assertThat(action1.getName(), is(action11.getName()));
+		assertThat(action1.getSpel()).isEqualTo(action11.getSpel());
+		assertThat(action1.getName()).isEqualTo(action11.getName());
 	}
 
 	@Test
@@ -191,16 +195,16 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 
 		transitionsRepository.save(transition);
 		JpaRepositoryTransition transition2 = transitionsRepository.findAll().iterator().next();
-		assertThat(transition2.getSource().getState(), is("S1"));
-		assertThat(transition2.getTarget().getState(), is("S2"));
-		assertThat(transition2.getEvent(), is("E1"));
+		assertThat(transition2.getSource().getState()).isEqualTo("S1");
+		assertThat(transition2.getTarget().getState()).isEqualTo("S2");
+		assertThat(transition2.getEvent()).isEqualTo("E1");
 
-		assertThat(actionsRepository.count(), is(1l));
+		assertThat(actionsRepository.count()).isEqualTo(1l);
 		JpaRepositoryAction action11 = actionsRepository.findAll().iterator().next();
-		assertThat(action1.getName(), is(action11.getName()));
+		assertThat(action1.getName()).isEqualTo(action11.getName());
 
 
-		assertThat(transition2.getActions().size(), is(1));
+		assertThat(transition2.getActions()).hasSize(1);
 	}
 
 	@Test
@@ -215,12 +219,12 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		JpaRepositoryAction action1 = new JpaRepositoryAction();
 		action1.setName("action1");
 		actionsRepository.save(action1);
-		assertThat(actionsRepository.count(), is(1l));
+		assertThat(actionsRepository.count()).isEqualTo(1l);
 
 		JpaRepositoryAction action2 = new JpaRepositoryAction();
 		action2.setName("action2");
 		actionsRepository.save(action2);
-		assertThat(actionsRepository.count(), is(2l));
+		assertThat(actionsRepository.count()).isEqualTo(2l);
 
 		JpaRepositoryState stateS1 = new JpaRepositoryState("S1");
 		stateS1.setEntryActions(new HashSet<>(Arrays.asList(action1, action2)));
@@ -238,12 +242,12 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		JpaRepositoryTransition transition1 = new JpaRepositoryTransition(stateS1, stateS2, "E1");
 		transition1.setActions(new HashSet<>(Arrays.asList(action1, action2)));
 		transitionsRepository.save(transition1);
-		assertThat(transitionsRepository.count(), is(1l));
+		assertThat(transitionsRepository.count()).isEqualTo(1l);
 
 		JpaRepositoryTransition transition2 = new JpaRepositoryTransition(stateS2, stateS3, "E2");
 		transition2.setActions(new HashSet<>(Arrays.asList(action1, action2)));
 		transitionsRepository.save(transition2);
-		assertThat(transitionsRepository.count(), is(2l));
+		assertThat(transitionsRepository.count()).isEqualTo(2l);
 	}
 
 	@Test
@@ -258,14 +262,14 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 		machine1.setState("S1");
 		machine1.setStateMachineContext(new byte[] { 0 });
 
-		assertThat(stateMachineRepository.count(), is(0l));
+		assertThat(stateMachineRepository.count()).isEqualTo(0l);
 		stateMachineRepository.save(machine1);
-		assertThat(stateMachineRepository.count(), is(1l));
+		assertThat(stateMachineRepository.count()).isEqualTo(1l);
 
 		JpaRepositoryStateMachine machine1x = stateMachineRepository.findById("machine1").get();
-		assertThat(machine1x.getMachineId(), is(machine1.getMachineId()));
-		assertThat(machine1x.getState(), is(machine1.getState()));
-		assertThat(machine1x.getStateMachineContext().length, is(1));
+		assertThat(machine1x.getMachineId()).isEqualTo(machine1.getMachineId());
+		assertThat(machine1x.getState()).isEqualTo(machine1.getState());
+		assertThat(machine1x.getStateMachineContext().length).isEqualTo(1);
 	}
 
 	@Override
@@ -285,33 +289,55 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testStateMachinePersistWithStrings() {
 		context.register(TestConfig.class, ConfigWithStrings.class);
 		context.refresh();
 
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
-		stateMachine.start();
-		assertThat(stateMachine.getState().getId(), is("S1"));
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getId(), is("S2"));
-		stateMachine.sendEvent("E2");
-		assertThat(stateMachine.getState().getId(), is("S1"));
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getId()).isEqualTo("S1");
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getId()).isEqualTo("S2");
+		doSendEventAndConsumeAll(stateMachine, "E2");
+		assertThat(stateMachine.getState().getId()).isEqualTo("S1");
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testStateMachinePersistWithEnums() {
 		context.register(TestConfig.class, ConfigWithEnums.class);
 		context.refresh();
 
-		StateMachine<PersistTestStates, PersistTestEvents> stateMachine = context.getBean(StateMachine.class);
-		stateMachine.start();
-		assertThat(stateMachine.getState().getId(), is(PersistTestStates.S1));
-		stateMachine.sendEvent(PersistTestEvents.E1);
-		assertThat(stateMachine.getState().getId(), is(PersistTestStates.S2));
-		stateMachine.sendEvent(PersistTestEvents.E2);
-		assertThat(stateMachine.getState().getId(), is(PersistTestStates.S1));
+		StateMachine<PersistTestStates, PersistTestEvents> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getId()).isEqualTo(PersistTestStates.S1);
+		doSendEventAndConsumeAll(stateMachine, PersistTestEvents.E1);
+		assertThat(stateMachine.getState().getId()).isEqualTo(PersistTestStates.S2);
+		doSendEventAndConsumeAll(stateMachine, PersistTestEvents.E2);
+		assertThat(stateMachine.getState().getId()).isEqualTo(PersistTestStates.S1);
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testStateMachinePersistWithRootRegions() {
+		context.register(TestConfig.class, ConfigWithRootRegions.class);
+		context.refresh();
+		JpaStateMachineRepository stateMachineRepository = context.getBean(JpaStateMachineRepository.class);
+
+		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsOnly("S10", "S20");
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S11", "S21");
+
+		assertThat(stateMachineRepository.count()).isEqualTo(3l);
+
+		List<String> ids = StreamSupport.stream(stateMachineRepository.findAll().spliterator(), false)
+				.map(jrsm -> jrsm.getMachineId()).collect(Collectors.toList());
+		assertThat(ids).hasSize(3);
+
+		// [null#238e8cc0-a932-4583-b696-2c057e5ebefe, null#486e20be-853e-4e4d-9a68-c62c061469ef, testid]
+		assertThat(ids).containsOnly("testid", "testid#R1", "testid#R2");
+
 	}
 
 	@EnableAutoConfiguration
@@ -441,5 +467,58 @@ public class JpaRepositoryTests extends AbstractRepositoryTests {
 
 	public enum PersistTestEvents {
 		E1, E2;
+	}
+
+	@Configuration
+	@EnableStateMachine
+	static class ConfigWithRootRegions extends StateMachineConfigurerAdapter<String, String> {
+
+		@Autowired
+		private JpaStateMachineRepository jpaStateMachineRepository;
+
+		@Override
+		public void configure(StateMachineConfigurationConfigurer<String, String> config) throws Exception {
+			config
+				.withConfiguration()
+					.machineId("testid")
+					.and()
+				.withPersistence()
+					.runtimePersister(stateMachineRuntimePersister());
+		}
+
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.region("R1")
+					.initial("S10")
+					.state("S10")
+					.state("S11")
+					.and()
+				.withStates()
+					.region("R2")
+					.initial("S20")
+					.state("S20")
+					.state("S21");
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("S10")
+					.target("S11")
+					.event("E1")
+					.and()
+				.withExternal()
+					.source("S20")
+					.target("S21")
+					.event("E1");
+		}
+
+		@Bean
+		public StateMachineRuntimePersister<String, String, String> stateMachineRuntimePersister() {
+			return new JpaPersistingStateMachineInterceptor<>(jpaStateMachineRepository);
+		}
 	}
 }

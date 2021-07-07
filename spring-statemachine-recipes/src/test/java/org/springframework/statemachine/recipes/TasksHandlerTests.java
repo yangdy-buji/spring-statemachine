@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,8 @@
  */
 package org.springframework.statemachine.recipes;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
@@ -45,90 +44,90 @@ public class TasksHandlerTests {
 	@Test
 	public void testRunOnceSimpleNoFailures() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(9, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(9));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(9);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables.size()).isEqualTo(3);
 	}
 
 	@Test
 	public void testRunFail() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(11, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(11));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(11);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables.size()).isEqualTo(3);
 	}
 
 	@Test
 	public void testRunFailAndFixAndContinue() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(11, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(11));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(11);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL);
 
 		listener.reset(0, 0, 0, 0, 1);
 		handler.fixCurrentProblems();
-		assertThat(listener.extendedStateChangedLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(listener.extendedStateChangedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		listener.reset(1, 0, 0);
 		handler.continueFromError();
-		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 	}
 
 	@Test
 	public void testRunFailAndAutomaticFix() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.build();
 
 		TestTasksListener tasksListener = new TestTasksListener();
 		tasksListener.fix = true;
@@ -138,218 +137,218 @@ public class TasksHandlerTests {
 		listener.reset(1, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(10, 0, 0);
 
 		handler.runTasks();
-		assertThat(listener.stateChangedLatch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(10));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(20, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(10);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 	}
 
 	@Test
 	public void testDagSingleRoot() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("1", "12", sleepRunnable())
-				.task("1", "13", sleepRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("1", "12", sleepRunnable())
+			.task("1", "13", sleepRunnable())
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(9, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(12, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(9));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(12, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(9);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables.size()).isEqualTo(3);
 	}
 
 	@Test
 	public void testDagMultiRoot() throws InterruptedException {
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("1", "12", sleepRunnable())
-				.task("1", "13", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("2", "22", sleepRunnable())
-				.task("2", "23", sleepRunnable())
-				.task("3", sleepRunnable())
-				.task("3", "32", sleepRunnable())
-				.task("3", "33", sleepRunnable())
-				.build();
+			.task("1", sleepRunnable())
+			.task("1", "12", sleepRunnable())
+			.task("1", "13", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("2", "22", sleepRunnable())
+			.task("2", "23", sleepRunnable())
+			.task("3", sleepRunnable())
+			.task("3", "32", sleepRunnable())
+			.task("3", "33", sleepRunnable())
+			.build();
 
 		TestListener listener = new TestListener();
 		StateMachine<String, String> machine = handler.getStateMachine();
 
 		machine.addStateListener(listener);
 		listener.reset(1, 0, 0);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(20, 0, 0);
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(20));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(20, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(20);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(9));
+		assertThat(variables.size()).isEqualTo(9);
 	}
 
 	@Test
 	public void testEvents1() throws InterruptedException {
 		TestTasksListener tasksListener = new TestTasksListener();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.listener(tasksListener)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.listener(tasksListener)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(9, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		tasksListener.reset(1, 0, 3, 3, 0, 3, 1, 0);
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(9));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(9);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 
-		assertThat(tasksListener.onTasksStartedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTasksStarted, is(1));
-		assertThat(tasksListener.onTaskPreExecuteLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTaskPreExecute, is(3));
-		assertThat(tasksListener.onTaskPostExecuteLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTaskPostExecute, is(3));
-		assertThat(tasksListener.onTaskFailed, is(0));
-		assertThat(tasksListener.onTaskSuccessLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTaskSuccess, is(3));
-		assertThat(tasksListener.onTasksSuccessLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTasksSuccess, is(1));
+		assertThat(tasksListener.onTasksStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTasksStarted).isEqualTo(1);
+		assertThat(tasksListener.onTaskPreExecuteLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTaskPreExecute).isEqualTo(3);
+		assertThat(tasksListener.onTaskPostExecuteLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTaskPostExecute).isEqualTo(3);
+		assertThat(tasksListener.onTaskFailed).isEqualTo(0);
+		assertThat(tasksListener.onTaskSuccessLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTaskSuccess).isEqualTo(3);
+		assertThat(tasksListener.onTasksSuccessLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTasksSuccess).isEqualTo(1);
 	}
 
 	@Test
 	public void testEvents2() throws InterruptedException {
 		TestTasksListener tasksListener = new TestTasksListener();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.listener(tasksListener)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.listener(tasksListener)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(11, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		tasksListener.reset(1, 0, 0, 0, 1, 0, 0, 1);
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(11));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(11);
 
-		assertThat(tasksListener.onTasksStartedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTasksStarted, is(1));
-		assertThat(tasksListener.onTaskSuccessLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTaskSuccess, is(2));
-		assertThat(tasksListener.onTaskFailedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTaskFailed, is(1));
-		assertThat(tasksListener.onTasksErrorLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTasksError, is(1));
-		assertThat(tasksListener.onTasksSuccess, is(0));
+		assertThat(tasksListener.onTasksStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTasksStarted).isEqualTo(1);
+		assertThat(tasksListener.onTaskSuccessLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTaskSuccess).isEqualTo(2);
+		assertThat(tasksListener.onTaskFailedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTaskFailed).isEqualTo(1);
+		assertThat(tasksListener.onTasksErrorLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTasksError).isEqualTo(1);
+		assertThat(tasksListener.onTasksSuccess).isEqualTo(0);
 	}
 
 	@Test
 	public void testEvents3() throws InterruptedException {
 		TestTasksListener tasksListener = new TestTasksListener();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.listener(tasksListener)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.listener(tasksListener)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(11, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		tasksListener.reset(0, 1, 0, 0, 0, 0, 0, 0);
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(11));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(11);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL);
 
 		listener.reset(1, 0, 0);
 		handler.fixCurrentProblems();
 		handler.continueFromError();
-		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 
-		assertThat(tasksListener.onTasksContinueLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(tasksListener.onTasksContinue, is(1));
+		assertThat(tasksListener.onTasksContinueLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(tasksListener.onTasksContinue).isEqualTo(1);
 	}
 
 	@Test
 	public void testPersist1() throws InterruptedException {
 		TestStateMachinePersist persist = new TestStateMachinePersist();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(9, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		persist.reset(5);
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(9));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(9);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables.size()).isEqualTo(3);
 
-		assertThat(persist.writeLatch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(persist.contexts.size(), is(5));
+		assertThat(persist.writeLatch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(persist.contexts.size()).isEqualTo(5);
 
 		for (StateMachineContext<String, String> context : persist.getContexts()) {
 			if (context.getState() == "TASKS") {
-				assertThat(context.getChilds().size(), is(3));
+				assertThat(context.getChilds().size()).isEqualTo(3);
 			} else {
-				assertThat(context.getChilds().size(), is(0));
+				assertThat(context.getChilds().size()).isEqualTo(0);
 			}
 		}
 	}
@@ -358,39 +357,39 @@ public class TasksHandlerTests {
 	public void testPersist2() throws InterruptedException {
 		TestStateMachinePersist persist = new TestStateMachinePersist();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", failRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", failRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(11, 0, 0);
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		persist.reset(6);
 
 		handler.runTasks();
 
-		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(11));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL));
+		assertThat(listener.stateChangedLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(11);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables.size()).isEqualTo(3);
 
-		assertThat(persist.writeLatch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(persist.contexts.size(), is(6));
+		assertThat(persist.writeLatch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(persist.contexts.size()).isEqualTo(6);
 
 		for (StateMachineContext<String, String> context : persist.getContexts()) {
 			if (context.getState() == "TASKS") {
-				assertThat(context.getChilds().size(), is(3));
+				assertThat(context.getChilds().size()).isEqualTo(3);
 			} else if (context.getState() == "ERROR") {
-				assertThat(context.getChilds().size(), is(1));
+				assertThat(context.getChilds().size()).isEqualTo(1);
 			} else {
-				assertThat(context.getChilds().size(), is(0));
+				assertThat(context.getChilds().size()).isEqualTo(0);
 			}
 		}
 	}
@@ -399,17 +398,17 @@ public class TasksHandlerTests {
 	public void testReset1() throws InterruptedException {
 		TestStateMachinePersist persist = new TestStateMachinePersist();
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		StateMachine<String, String> machine = handler.getStateMachine();
 		machine.addStateListener(listener);
 		handler.resetFromPersistStore();
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@Test
@@ -420,11 +419,11 @@ public class TasksHandlerTests {
 		DefaultStateMachineContext<String, String> context = new DefaultStateMachineContext<String, String>(childs, "ERROR", null, null, null);
 		TestStateMachinePersist persist = new TestStateMachinePersist(context);
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		StateMachine<String, String> machine = handler.getStateMachine();
@@ -432,8 +431,8 @@ public class TasksHandlerTests {
 
 		handler.resetFromPersistStore();
 
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL));
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_ERROR, TasksHandler.STATE_MANUAL);
 	}
 
 	@Test
@@ -443,11 +442,11 @@ public class TasksHandlerTests {
 		DefaultStateMachineContext<String, String> context = new DefaultStateMachineContext<String, String>(childs, "ERROR", null, null, null);
 		TestStateMachinePersist persist = new TestStateMachinePersist(context);
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(2, 0, 0);
@@ -457,12 +456,12 @@ public class TasksHandlerTests {
 		handler.resetFromPersistStore();
 
 		log.info("testReset3 wait stateMachineStartedLatch");
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
 		log.info("testReset3 wait stateChangedLatch");
-		assertThat(listener.stateChangedLatch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(2));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 	}
 
 	//@Test
@@ -474,11 +473,11 @@ public class TasksHandlerTests {
 		DefaultStateMachineContext<String, String> context = new DefaultStateMachineContext<String, String>(childs, "ERROR", null, null, null);
 		TestStateMachinePersist persist = new TestStateMachinePersist(context);
 		TasksHandler handler = TasksHandler.builder()
-				.task("1", sleepRunnable())
-				.task("2", sleepRunnable())
-				.task("3", sleepRunnable())
-				.persist(persist)
-				.build();
+			.task("1", sleepRunnable())
+			.task("2", sleepRunnable())
+			.task("3", sleepRunnable())
+			.persist(persist)
+			.build();
 
 		TestListener listener = new TestListener();
 		listener.reset(2, 0, 0);
@@ -487,11 +486,11 @@ public class TasksHandlerTests {
 
 		handler.resetFromPersistStore();
 
-		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
-		assertThat(listener.stateChangedLatch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(2));
-		assertThat(machine.getState().getIds(), contains(TasksHandler.STATE_READY));
+		assertThat(listener.stateChangedLatch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
+		assertThat(machine.getState().getIds()).contains(TasksHandler.STATE_READY);
 	}
 
 	private static Runnable sleepRunnable() {
@@ -543,7 +542,7 @@ public class TasksHandlerTests {
 		@Override
 		public void stateChanged(State<String, String> from, State<String, String> to) {
 			synchronized (lock) {
-				TasksHandlerTests.log.info("stateChanged "  + from + "::" + to);
+				TasksHandlerTests.log.info("stateChanged " + from + "::" + to);
 				stateChangedCount++;
 				stateChangedLatch.countDown();
 			}

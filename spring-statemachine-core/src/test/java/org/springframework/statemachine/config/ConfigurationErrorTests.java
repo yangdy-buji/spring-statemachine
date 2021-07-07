@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,13 @@
  */
 package org.springframework.statemachine.config;
 
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.isA;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
@@ -37,9 +34,6 @@ import org.springframework.statemachine.config.model.verifier.StateMachineModelV
 
 public class ConfigurationErrorTests extends AbstractStateMachineTests {
 
-	@Rule
-	public ExpectedException expectedException = ExpectedException.none();
-
 	@Override
 	protected AnnotationConfigApplicationContext buildContext() {
 		return new AnnotationConfigApplicationContext();
@@ -47,41 +41,49 @@ public class ConfigurationErrorTests extends AbstractStateMachineTests {
 
 	@Test
 	public void testInitialStateNotSet1() {
-		expectedException.expectCause(isA(MalformedConfigurationException.class));
-		context.register(Config1.class);
-		context.refresh();
+		assertThatThrownBy(() -> {
+			context.register(Config1.class);
+			context.refresh();
+		}).satisfies(e -> {
+			assertThat(e.getCause()).isInstanceOf(MalformedConfigurationException.class);
+		});
 	}
 
 	@Test
 	public void testInitialStateNotSet2() throws Exception {
-		expectedException.expectCause(isA(MalformedConfigurationException.class));
-		Builder<String, String> builder = StateMachineBuilder.builder();
-		builder
-			.configureStates()
+		assertThatThrownBy(() -> {
+			Builder<String, String> builder = StateMachineBuilder.builder();
+			builder
+				.configureStates()
 				.withStates()
-					.state("S1")
-					.state("S2");
-		builder
-			.configureTransitions()
+				.state("S1")
+				.state("S2");
+			builder
+				.configureTransitions()
 				.withExternal()
-					.source("S1")
-					.target("S2")
-					.event("E1");
-
-		builder.build();
+				.source("S1")
+				.target("S2")
+				.event("E1");
+			builder.build();
+		}).satisfies(e -> {
+			assertThat(e.getCause()).isInstanceOf(MalformedConfigurationException.class);
+		});
 	}
 
 	@Test
 	public void testNoTransitions() throws Exception {
-		expectedException.expectCause(isA(MalformedConfigurationException.class));
-		Builder<String, String> builder = StateMachineBuilder.builder();
-		builder
-			.configureStates()
+		assertThatThrownBy(() -> {
+			Builder<String, String> builder = StateMachineBuilder.builder();
+			builder
+				.configureStates()
 				.withStates()
-					.initial("S1")
-					.state("S1")
-					.state("S2");
-		builder.build();
+				.initial("S1")
+				.state("S1")
+				.state("S2");
+			builder.build();
+		}).satisfies(e -> {
+			assertThat(e.getCause()).isInstanceOf(MalformedConfigurationException.class);
+		});
 	}
 
 	@Test
@@ -116,7 +118,28 @@ public class ConfigurationErrorTests extends AbstractStateMachineTests {
 					.state("S1")
 					.state("S2");
 		builder.build();
-		assertThat(verifier.latch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(verifier.latch.await(2, TimeUnit.SECONDS)).isTrue();
+	}
+
+	@Test
+	public void testPseudostateNoTransition() throws Exception {
+		assertThatThrownBy(() -> {
+			Builder<String, String> builder = StateMachineBuilder.builder();
+			builder.configureStates()
+				.withStates()
+					.initial("S1")
+					.state("S1")
+					.choice("S2")
+					.state("S3");
+			builder.configureTransitions()
+				.withExternal()
+					.source("S1")
+					.target("S2");
+			builder.build();
+		}).satisfies(e -> {
+			assertThat(e.getCause()).isInstanceOf(MalformedConfigurationException.class);
+			assertThat(e.getLocalizedMessage()).contains("No transitions for state S2");
+		});
 	}
 
 	@Configuration

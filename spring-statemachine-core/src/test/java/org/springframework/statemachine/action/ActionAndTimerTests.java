@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2017 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,18 @@
  */
 package org.springframework.statemachine.action;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
@@ -41,64 +39,33 @@ import org.springframework.statemachine.state.State;
 
 public class ActionAndTimerTests extends AbstractStateMachineTests {
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testExitActionWithTimerOnce() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		TestTimerAction testTimerAction = context.getBean(TestTimerAction.class);
 		TestExitAction testExitAction = context.getBean(TestExitAction.class);
 		TestListener testListener = new TestListener();
 		machine.addStateListener(testListener);
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
-		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S1);
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2);
 
-		assertThat(testTimerAction.latch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(testTimerAction.e, nullValue());
+		assertThat(testTimerAction.latch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(testTimerAction.e).isNull();
 
 		// need to sleep for TimerTrigger not causing
 		// next event to get handled with threads, thus
 		// causing interrupt
 		Thread.sleep(1000);
 
-		machine.sendEvent(TestEvents.E2);
-		assertThat(testListener.s3EnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S3));
-		assertThat(testExitAction.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testExitAction.e, nullValue());
-	}
-
-	@SuppressWarnings("unchecked")
-	@Test
-	public void testExitActionWithTimerOnceThreadPoolTaskScheduler() throws Exception {
-		context.register(Config2.class);
-		context.refresh();
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachine.class);
-		TestTimerAction testTimerAction = context.getBean(TestTimerAction.class);
-		TestExitAction testExitAction = context.getBean(TestExitAction.class);
-		TestListener testListener = new TestListener();
-		machine.addStateListener(testListener);
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
-		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
-
-		assertThat(testTimerAction.latch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(testTimerAction.e, nullValue());
-
-		// need to sleep for TimerTrigger not causing
-		// next event to get handled with threads, thus
-		// causing interrupt
-		Thread.sleep(1000);
-
-		machine.sendEvent(TestEvents.E2);
-		assertThat(testListener.s3EnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S3));
-		assertThat(testExitAction.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testExitAction.e, nullValue());
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		assertThat(testListener.s3EnteredLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S3);
+		assertThat(testExitAction.latch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testExitAction.e).isNull();
 	}
 
 	@Configuration
@@ -174,12 +141,6 @@ public class ActionAndTimerTests extends AbstractStateMachineTests {
 					.source(TestStates.S2)
 					.action(testTimerAction())
 					.timerOnce(1000);
-		}
-
-		@Bean
-		public TaskScheduler taskScheduler() {
-			ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-			return taskScheduler;
 		}
 
 		@Bean

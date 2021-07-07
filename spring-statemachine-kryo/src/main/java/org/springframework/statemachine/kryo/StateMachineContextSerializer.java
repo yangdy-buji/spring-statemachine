@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
  */
 package org.springframework.statemachine.kryo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +38,9 @@ import com.esotericsoftware.kryo.io.Output;
  */
 public class StateMachineContextSerializer<S, E> extends Serializer<StateMachineContext<S, E>> {
 
+	// NOTE: when structure of this serialisation is changed, see how things are tested
+	//       in StateMachineContextSerializerTests.
+
 	@Override
 	public void write(Kryo kryo, Output output, StateMachineContext<S, E> context) {
 		kryo.writeClassAndObject(output, context.getEvent());
@@ -46,6 +50,11 @@ public class StateMachineContextSerializer<S, E> extends Serializer<StateMachine
 		kryo.writeClassAndObject(output, context.getChilds());
 		kryo.writeClassAndObject(output, context.getHistoryStates());
 		kryo.writeClassAndObject(output, context.getId());
+		// child refs were added after initial implementation, leaving this here
+		// in case it's starting to cause issues with any existing serialised contexts
+		// which doesn't have this field
+		// NOTE: PR #722 added fixes with new tests
+		kryo.writeClassAndObject(output, context.getChildReferences());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -58,7 +67,12 @@ public class StateMachineContextSerializer<S, E> extends Serializer<StateMachine
 		List<StateMachineContext<S, E>> childs = (List<StateMachineContext<S, E>>) kryo.readClassAndObject(input);
 		Map<S, S> historyStates = (Map<S, S>) kryo.readClassAndObject(input);
 		String id = (String) kryo.readClassAndObject(input);
-		return new DefaultStateMachineContext<S, E>(childs, state, event, eventHeaders, new DefaultExtendedState(variables), historyStates, id);
-	}
+		List<String> childRefs = new ArrayList<>();
+		if(input.canReadInt()) {
+			childRefs = (List<String>) kryo.readClassAndObject(input);
+		}
 
+		return new DefaultStateMachineContext<S, E>(childRefs, childs, state, event, eventHeaders,
+				new DefaultExtendedState(variables), historyStates, id);
+	}
 }

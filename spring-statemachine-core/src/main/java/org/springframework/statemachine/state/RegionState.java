@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,12 +17,18 @@ package org.springframework.statemachine.state;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.function.Function;
 
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateContext;
-import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.region.Region;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.support.StateMachineUtils;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * A {@link State} implementation where states are wrapped in a regions..
@@ -33,6 +39,8 @@ import org.springframework.statemachine.support.StateMachineUtils;
  * @param <E> the type of event
  */
 public class RegionState<S, E> extends AbstractState<S, E> {
+
+	private RegionExecutionPolicy regionExecutionPolicy;
 
 	/**
 	 * Instantiates a new region state.
@@ -77,7 +85,8 @@ public class RegionState<S, E> extends AbstractState<S, E> {
 	 * @param pseudoState the pseudo state
 	 */
 	public RegionState(S id, Collection<Region<S, E>> regions, Collection<E> deferred,
-			Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions, PseudoState<S, E> pseudoState) {
+			Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions, PseudoState<S, E> pseudoState) {
 		super(id, deferred, entryActions, exitActions, pseudoState, regions);
 	}
 
@@ -91,19 +100,23 @@ public class RegionState<S, E> extends AbstractState<S, E> {
 	 * @param exitActions the exit actions
 	 */
 	public RegionState(S id, Collection<Region<S, E>> regions, Collection<E> deferred,
-			Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions) {
+			Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions) {
 		super(id, deferred, entryActions, exitActions, null, regions);
 	}
 
 	@Override
-	public boolean sendEvent(Message<E> event) {
-		boolean accept = false;
-		if (getRegions() != null) {
-			for (Region<S, E> r : getRegions()) {
-				accept |= r.sendEvent(event);
-			}
+	public Flux<StateMachineEventResult<S, E>> sendEvent(Message<E> event) {
+		if(regionExecutionPolicy == RegionExecutionPolicy.PARALLEL) {
+			return Flux.fromIterable(getRegions())
+				.parallel()
+				.runOn(Schedulers.parallel())
+				.flatMap(r -> r.sendEvent(Mono.just(event)))
+				.sequential();
+		} else {
+			return Flux.fromIterable(getRegions())
+				.flatMap(r -> r.sendEvent(Mono.just(event)));
 		}
-		return accept;
 	}
 
 	@Override
@@ -125,43 +138,50 @@ public class RegionState<S, E> extends AbstractState<S, E> {
 	}
 
 	@Override
-	public void exit(StateContext<S, E> context) {
-		super.exit(context);
-		for (Region<S, E> region : getRegions()) {
-			if (region.getState() != null) {
-				region.getState().exit(context);
+	public Mono<Void> exit(StateContext<S, E> context) {
+		Mono<Void> actions = Flux.fromIterable(getExitActions())
+			.flatMap(a -> executeAction(a, context))
+			.then();
+		Mono<Void> regionsThenActions = Flux.fromIterable(getRegions())
+			.flatMap(r -> r.stopReactively())
+			.then(actions);
+		return super.exit(context)
+			.then(regionsThenActions);
+	}
+
+	private Mono<Void> startOrEntry(StateContext<S, E> context) {
+		if (getPseudoState() != null && getPseudoState().getKind() == PseudoStateKind.INITIAL) {
+			if (regionExecutionPolicy == RegionExecutionPolicy.PARALLEL) {
+				return Flux.fromIterable(getRegions())
+					.filter(r -> !StateMachineUtils.containsAtleastOne(r.getStates(), context.getTargets()))
+					.parallel()
+					.runOn(Schedulers.parallel())
+					.flatMap(r -> r.startReactively())
+					.sequential()
+					.then();
+			} else {
+				return Flux.fromIterable(getRegions())
+					.filter(r -> !StateMachineUtils.containsAtleastOne(r.getStates(), context.getTargets()))
+					.flatMap(r -> r.startReactively())
+					.then();
+
 			}
-			region.stop();
-		}
-		for (Action<S, E> action : getExitActions()) {
-			executeAction(action, context);
+		} else {
+			return Flux.fromIterable(getRegions())
+				.filter(r -> r.getState() != null)
+				.doOnNext(r -> r.getState().entry(context))
+				.then();
 		}
 	}
 
 	@Override
-	public void entry(StateContext<S, E> context) {
-		super.entry(context);
-		for (Action<S, E> action : getEntryActions()) {
-			executeAction(action, context);
-		}
-
-		if (getPseudoState() != null && getPseudoState().getKind() == PseudoStateKind.INITIAL) {
-			for (Region<S, E> region : getRegions()) {
-				boolean start = true;
-				if (StateMachineUtils.containsAtleastOne(region.getStates(), context.getTargets())) {
-					start = false;
-				}
-				if (start) {
-					region.start();
-				}
-			}
-		} else {
-			for (Region<S, E> region : getRegions()) {
-				if (region.getState() != null) {
-					region.getState().entry(context);
-				}
-			}
-		}
+	public Mono<Void> entry(StateContext<S, E> context) {
+		Mono<Void> actions = Flux.fromIterable(getEntryActions())
+			.flatMap(a -> executeAction(a, context))
+			.then();
+		return super.entry(context)
+			.and(actions)
+			.then(startOrEntry(context));
 	}
 
 	@Override
@@ -191,10 +211,18 @@ public class RegionState<S, E> extends AbstractState<S, E> {
 		return states;
 	}
 
+	/**
+	 * Sets the region execution policy.
+	 *
+	 * @param regionExecutionPolicy the new region execution policy
+	 */
+	public void setRegionExecutionPolicy(RegionExecutionPolicy regionExecutionPolicy) {
+		this.regionExecutionPolicy = regionExecutionPolicy;
+	}
+
 	@Override
 	public String toString() {
 		return "RegionState [getIds()=" + getIds() + ", getClass()=" + getClass() + ", hashCode()=" + hashCode()
 				+ ", toString()=" + super.toString() + "]";
 	}
-
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,7 @@
  */
 package org.springframework.statemachine.annotation;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,15 +24,13 @@ import java.lang.annotation.Target;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
-import org.springframework.statemachine.annotation.OnTransition;
-import org.springframework.statemachine.annotation.WithStateMachine;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -45,7 +42,7 @@ public class ClassAnnotationTests extends AbstractStateMachineTests {
 	@SuppressWarnings("unchecked")
 	public void testClassAnnotations() throws Exception {
 		AnnotationConfigApplicationContext context =
-				new AnnotationConfigApplicationContext(BaseConfig.class, BeanConfig1.class, FooConfig.class, BarConfig.class);
+				new AnnotationConfigApplicationContext(BeanConfig1.class, FooConfig.class, BarConfig.class);
 
 		ObjectStateMachine<TestStates,TestEvents> fooMachine =
 				context.getBean("fooMachine", ObjectStateMachine.class);
@@ -53,8 +50,8 @@ public class ClassAnnotationTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates,TestEvents> barMachine =
 				context.getBean("barMachine", ObjectStateMachine.class);
 
-		assertThat(context.containsBean("fooMachine"), is(true));
-		assertThat(context.containsBean("barMachine"), is(true));
+		assertThat(context.containsBean("fooMachine")).isTrue();
+		assertThat(context.containsBean("barMachine")).isTrue();
 		fooMachine.start();
 		barMachine.start();
 
@@ -66,16 +63,16 @@ public class ClassAnnotationTests extends AbstractStateMachineTests {
 		// this event should cause 'FooBean.fooMethod' to get called
 		fooMachine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
 
-		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(barBean.onBarMethodLatch.await(2, TimeUnit.SECONDS), is(false));
+		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(barBean.onBarMethodLatch.await(2, TimeUnit.SECONDS)).isFalse();
 
 		fooBean.resetMethodLatch();
 
 		// this event should cause 'BarBean.barMethod' to get called
 		barMachine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
 
-		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS), is(false));
-		assertThat(barBean.onBarMethodLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS)).isFalse();
+		assertThat(barBean.onBarMethodLatch.await(2, TimeUnit.SECONDS)).isTrue();
 
 		context.close();
 	}
@@ -84,21 +81,21 @@ public class ClassAnnotationTests extends AbstractStateMachineTests {
 	@SuppressWarnings("unchecked")
 	public void testClassAnnotationsWithMeta() throws Exception {
 		AnnotationConfigApplicationContext context =
-				new AnnotationConfigApplicationContext(BaseConfig.class, BeanConfig2.class, JeeConfig.class, FooConfig.class);
+				new AnnotationConfigApplicationContext(BeanConfig2.class, JeeConfig.class, FooConfig.class);
 
 		ObjectStateMachine<TestStates,TestEvents> jeeMachine =
 				context.getBean("jeeMachine", ObjectStateMachine.class);
 
-		assertThat(context.containsBean("fooMachine"), is(true));
-		assertThat(context.containsBean("jeeMachine"), is(true));
+		assertThat(context.containsBean("fooMachine")).isTrue();
+		assertThat(context.containsBean("jeeMachine")).isTrue();
 
 		JeeBean jeeBean = context.getBean(JeeBean.class);
 		FooBean fooBean = context.getBean(FooBean.class);
 		fooBean.resetMethodLatch();
 		jeeMachine.start();
 		jeeMachine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(jeeBean.onJeeMethodLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS), is(false));
+		assertThat(jeeBean.onJeeMethodLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(fooBean.onFooMethodLatch.await(2, TimeUnit.SECONDS)).isFalse();
 		context.close();
 	}
 

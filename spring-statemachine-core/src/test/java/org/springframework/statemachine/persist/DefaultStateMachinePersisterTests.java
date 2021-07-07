@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,13 @@
  */
 package org.springframework.statemachine.persist;
 
-import static org.hamcrest.CoreMatchers.anyOf;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
 
 import java.util.HashMap;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachinePersist;
@@ -41,88 +40,161 @@ public class DefaultStateMachinePersisterTests {
 	public void testSimpleFlat() throws Exception {
 		StateMachine<String, String> machine = buildSimpleFlat();
 
-		machine.start();
+		doStartAndAssert(machine);
+		doStartAndAssert(machine);
 		InMemoryStateMachinePersist1 persist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(persist);
 		persister.persist(machine, "xxx");
 		StateMachineContext<String, String> context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("SI"));
-		assertThat(context.getId(), nullValue());
-		assertThat(context.getChilds().isEmpty(), is(true));
+		assertThat(context.getState()).isEqualTo("SI");
+		assertThat(context.getId()).isNull();
+		assertThat(context.getChilds().isEmpty()).isTrue();
 
-		machine.sendEvent("E1");
+		doSendEventAndConsumeAll(machine, "E1");
+		doSendEventAndConsumeAll(machine, "E1");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("S1"));
+		assertThat(context.getState()).isEqualTo("S1");
 	}
 
 	@Test
 	public void testDeepNested() throws Exception {
 		StateMachine<String, String> machine = buildDeepNested();
 
-		machine.start();
+		doStartAndAssert(machine);
 		InMemoryStateMachinePersist1 persist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(persist);
 		persister.persist(machine, "xxx");
 		StateMachineContext<String, String> context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("SI"));
-		assertThat(context.getId(), nullValue());
-		assertThat(context.getChilds().isEmpty(), is(true));
+		assertThat(context.getState()).isEqualTo("SI");
+		assertThat(context.getId()).isNull();
+		assertThat(context.getChilds().isEmpty()).isTrue();
 
-		machine.sendEvent("E1");
+		doSendEventAndConsumeAll(machine, "E1");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("S1I"));
-		assertThat(context.getChilds().isEmpty(), is(true));
+		assertThat(context.getState()).isEqualTo("S1I");
+		assertThat(context.getChilds()).hasSize(1);
 
-		machine.sendEvent("E2");
+		doSendEventAndConsumeAll(machine, "E2");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("S11I"));
-		assertThat(context.getChilds().isEmpty(), is(true));
+		assertThat(context.getState()).isEqualTo("S11");
+		assertThat(context.getChilds()).hasSize(1);
 
-		machine.sendEvent("E3");
+		doSendEventAndConsumeAll(machine, "E3");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getState(), is("S111"));
-		assertThat(context.getChilds().isEmpty(), is(true));
+		assertThat(context.getState()).isEqualTo("S11");
+		assertThat(context.getChilds()).hasSize(1);
 	}
 
 	@Test
 	public void testDeepNestedRegions() throws Exception {
 		StateMachine<String, String> machine = buildDeepNestedRegions();
 
-		machine.start();
+		doStartAndAssert(machine);
 		InMemoryStateMachinePersist1 persist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(persist);
 		persister.persist(machine, "xxx");
 		StateMachineContext<String, String> context = persist.contexts.get("xxx");
-		assertThat(context.getState(), nullValue());
-		assertThat(context.getId(), nullValue());
-		assertThat(context.getChilds().size(), is(2));
-		assertThat(context.getChilds().get(0).getState(), anyOf(is("S111"), is("S21")));
-		assertThat(context.getChilds().get(1).getState(), anyOf(is("S111"), is("S21")));
+		assertThat(context.getState()).isNull();
+		assertThat(context.getId()).isNull();
+		assertThat(context.getChilds()).hasSize(2);
+		assertThat(context.getChilds().get(0).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S111"),
+			state -> assertThat(state).isEqualTo("S21")
+		);
+		assertThat(context.getChilds().get(1).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S111"),
+			state -> assertThat(state).isEqualTo("S21")
+		);
 
-		machine.sendEvent("E1");
+		doSendEventAndConsumeAll(machine, "E1");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getChilds().size(), is(2));
-		assertThat(context.getChilds().get(0).getState(), anyOf(is("S12"), is("S21")));
-		assertThat(context.getChilds().get(1).getState(), anyOf(is("S12"), is("S21")));
+		assertThat(context.getChilds()).hasSize(2);
+		assertThat(context.getChilds().get(0).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S21")
+		);
+		assertThat(context.getChilds().get(1).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S21")
+		);
 
-		machine.sendEvent("E2");
+		doSendEventAndConsumeAll(machine, "E2");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getChilds().size(), is(2));
-		assertThat(context.getChilds().get(0).getState(), anyOf(is("S12"), is("S221")));
-		assertThat(context.getChilds().get(1).getState(), anyOf(is("S12"), is("S221")));
+		assertThat(context.getChilds()).hasSize(2);
+		assertThat(context.getChilds().get(0).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S221")
+		);
+		assertThat(context.getChilds().get(1).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S221")
+		);
 
-		machine.sendEvent("E3");
+		doSendEventAndConsumeAll(machine, "E3");
 		persister.persist(machine, "xxx");
 		context = persist.contexts.get("xxx");
-		assertThat(context.getChilds().size(), is(2));
-		assertThat(context.getChilds().get(0).getState(), anyOf(is("S12"), is("S222")));
-		assertThat(context.getChilds().get(1).getState(), anyOf(is("S12"), is("S222")));
+		assertThat(context.getChilds()).hasSize(2);
+		assertThat(context.getChilds().get(0).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S222")
+		);
+		assertThat(context.getChilds().get(1).getState()).satisfiesAnyOf(
+			state -> assertThat(state).isEqualTo("S12"),
+			state -> assertThat(state).isEqualTo("S222")
+		);
+	}
+
+	@Test
+	public void testDeepNestedRegionsAndFork() throws Exception {
+		StateMachine<String, String> machine = buildDeepNestedRegionsAndFork();
+
+		doStartAndAssert(machine);
+		InMemoryStateMachinePersist1 persist = new InMemoryStateMachinePersist1();
+		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(persist);
+		persister.persist(machine, "xxx");
+		StateMachineContext<String, String> context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("S2");
+
+		doSendEventAndConsumeAll(machine, "E1");
+		persister.persist(machine, "xxx");
+		context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("S3");
+		assertThat(context.getChilds()).hasSize(1);
+		assertThat(context.getChilds().get(0).getChilds()).hasSize(2);
+
+		doSendEventAndConsumeAll(machine, "E2");
+		persister.persist(machine, "xxx");
+		context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("S3");
+		assertThat(context.getChilds()).hasSize(1);
+		assertThat(context.getChilds().get(0).getChilds()).hasSize(2);
+
+		doSendEventAndConsumeAll(machine, "E3");
+		persister.persist(machine, "xxx");
+		context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("S3");
+		assertThat(context.getChilds()).hasSize(1);
+		assertThat(context.getChilds().get(0).getChilds()).hasSize(2);
+
+		doSendEventAndConsumeAll(machine, "E4");
+		persister.persist(machine, "xxx");
+		context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("S3");
+		assertThat(context.getChilds()).hasSize(1);
+		assertThat(context.getChilds().get(0).getChilds()).hasSize(2);
+
+		doSendEventAndConsumeAll(machine, "E5");
+		persister.persist(machine, "xxx");
+		context = persist.contexts.get("xxx");
+		assertThat(context.getState()).isEqualTo("END");
+		assertThat(context.getChilds()).hasSize(1);
+		assertThat(context.getChilds().get(0).getChilds().isEmpty()).isTrue();
 	}
 
 	private StateMachine<String, String> buildSimpleFlat() throws Exception {
@@ -170,7 +242,6 @@ public class DefaultStateMachinePersisterTests {
 				.source("S11I")
 				.target("S111")
 				.event("E3");
-
 		return builder.build();
 	}
 
@@ -214,6 +285,78 @@ public class DefaultStateMachinePersisterTests {
 				.source("S221")
 				.target("S222")
 				.event("E3");
+
+		return builder.build();
+	}
+
+	private StateMachine<String, String> buildDeepNestedRegionsAndFork() throws Exception {
+		Builder<String, String> builder = StateMachineBuilder.builder();
+		builder.configureStates()
+		   	.withStates()
+			   	.initial("S1")
+			   	.and()
+				   	.withStates()
+					   	.parent("S1")
+					   	.initial("S2")
+					   	.state("S22")
+					   	.fork("F1")
+					   	.state("S3")
+						.join("J1")
+						.end("END")
+					   	.and()
+						   	.withStates()
+							   	.parent("S3")
+									.initial("S4")
+									.state("S41")
+									.end("S4E")
+									.and()
+							.withStates()
+								.parent("S3")
+									.initial("S5")
+									.state("S51")
+									.end("S5E");
+
+		builder.configureTransitions()
+		   	.withExternal()
+			   	.source("S2")
+			   	.target("S22")
+			   	.event("E1")
+			   	.and()
+		   	.withExternal()
+			   	.source("S22")
+			   	.target("F1")
+		   	.and()
+		   	.withFork()
+			   	.source("F1")
+			   	.target("S3")
+			   	.and()
+		   	.withExternal()
+				.source("S4")
+				.target("S41")
+				.event("E2")
+				.and()
+		   	.withExternal()
+				.source("S41")
+				.target("S4E")
+				.event("E3")
+				.and()
+		   	.withExternal()
+				.source("S5")
+				.target("S51")
+				.event("E4")
+				.and()
+		   	.withExternal()
+				.source("S51")
+				.target("S5E")
+				.event("E5")
+				.and()
+			.withJoin()
+				.source("S3")
+				.target("J1")
+				.and()
+			.withExternal()
+				.source("J1")
+				.target("END");
 
 		return builder.build();
 	}

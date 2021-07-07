@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,27 +15,29 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.StateContext.Stage;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -44,6 +46,11 @@ import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.support.DefaultExtendedState;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.test.StepVerifier;
 
 /**
  * Tests for resetting a state machine state and extended variables using a
@@ -63,83 +70,61 @@ public class StateMachineResetTests extends AbstractStateMachineTests {
 	public void testResetSubStates1() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 
 		Map<Object, Object> variables = new HashMap<Object, Object>();
 		variables.put("foo", 1);
 		ExtendedState extendedState = new DefaultExtendedState(variables);
 		DefaultStateMachineContext<States,Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S12, Events.I, null, extendedState);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S1, States.S12));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S12);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isEqualTo(1);
 	}
 
 	@Test
 	public void testResetSubStates2() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 
 		Map<Object, Object> variables = new HashMap<Object, Object>();
 		variables.put("foo", 1);
 		ExtendedState extendedState = new DefaultExtendedState(variables);
 		DefaultStateMachineContext<States,Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S211, Events.C, null, extendedState);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S2, States.S21, States.S211));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S2, States.S21, States.S211);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isEqualTo(1);
 	}
 
 	@Test
 	public void testResetSubStates3() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 
 		Map<Object, Object> variables = new HashMap<Object, Object>();
 		variables.put("foo", 1);
 		ExtendedState extendedState = new DefaultExtendedState(variables);
 		DefaultStateMachineContext<States,Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S2, Events.C, null, extendedState);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S2, States.S21, States.S211));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S2, States.S21, States.S211);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isEqualTo(1);
 	}
 
 	@Test
 	public void testResetRegions1() {
 		context.register(Config2.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 
 		DefaultStateMachineContext<TestStates, TestEvents> stateMachineContext1 =
 				new DefaultStateMachineContext<TestStates, TestEvents>(TestStates.S21, TestEvents.E2, null, null);
@@ -153,24 +138,17 @@ public class StateMachineResetTests extends AbstractStateMachineTests {
 		DefaultStateMachineContext<TestStates, TestEvents> stateMachineContext =
 				new DefaultStateMachineContext<TestStates, TestEvents>(childs, TestStates.S2, TestEvents.E1, null, null);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<TestStates, TestEvents>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<TestStates, TestEvents> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S31));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S31);
 	}
 
 	@Test
 	public void testResetRegions2() {
 		context.register(Config2.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 
 		DefaultStateMachineContext<TestStates, TestEvents> stateMachineContext1 =
 				new DefaultStateMachineContext<TestStates, TestEvents>(TestStates.S21, null, null, null);
@@ -184,99 +162,95 @@ public class StateMachineResetTests extends AbstractStateMachineTests {
 		DefaultStateMachineContext<TestStates, TestEvents> stateMachineContext =
 				new DefaultStateMachineContext<TestStates, TestEvents>(childs, TestStates.S2, null, null, null);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<TestStates, TestEvents>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<TestStates, TestEvents> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S31));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S31);
 	}
 
 	@Test
 	public void testResetUpdateExtendedStateVariables() {
 		context.register(Config3.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count"), nullValue());
-		machine.sendEvent(Events.A);
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count"), is(1));
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count")).isNull();
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count")).isEqualTo(1);
 
-		machine.stop();
+		doStopAndAssert(machine);
 		Map<Object, Object> variables = new HashMap<Object, Object>();
 		variables.putAll(machine.getExtendedState().getVariables());
 		ExtendedState extendedState = new DefaultExtendedState(variables);
 		DefaultStateMachineContext<States,Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S0, null, null, extendedState);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count"), is(1));
-		machine.sendEvent(Events.A);
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count"), is(2));
+		doStartAndAssert(machine);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count")).isEqualTo(1);
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count")).isEqualTo(2);
 	}
 
 	@Test
 	public void testResetWithNullContext() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S1, States.S11));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(0));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S11);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isZero();
 
-		machine.sendEvent(Events.I);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S1, States.S12));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(0));
+		doSendEventAndConsumeAll(machine, Events.I);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S12);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isZero();
 
-		machine.stop();
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		doStopAndAssert(machine);
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(null));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S11);
+		assertThat(machine.getExtendedState().getVariables()).isEmpty();
+	}
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(null);
-			}
-		});
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S1, States.S11));
-		assertThat(machine.getExtendedState().getVariables().size(), is(0));
+	@Test
+	public void testResetWithEnumToCorrectStartState() throws Exception {
+		context.register(Config1.class);
+		context.refresh();
+		StateMachine<States, Events> machine = resolveMachine(context);
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S11);
+
+		doSendEventAndConsumeAll(machine, Events.I);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S12);
+
+		doStopAndAssert(machine);
+		DefaultStateMachineContext<States, Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(
+				States.S11, null, null, null);
+		machine.getStateMachineAccessor()
+				.doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S11);
+		assertThat(States.S11).isEqualTo(stateMachineContext.getState());
+		assertThat(stateMachineContext.getState()).isNotEqualTo(machine.getInitialState());
 	}
 
 	@Test
 	public void testRestoreWithTimer() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachineFactory<States, Events> factory = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINEFACTORY,
-				StateMachineFactory.class);
+		StateMachineFactory<States, Events> factory = resolveFactory(context);
 		StateMachine<States, Events> machine = factory.getStateMachine();
 
 		DefaultStateMachineContext<States, Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S1, null,
 				null, null);
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-
-		machine.start();
+		doStartAndAssert(machine);
 		Thread.sleep(1100);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S2));
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
 
 	}
 
@@ -284,64 +258,89 @@ public class StateMachineResetTests extends AbstractStateMachineTests {
 	public void testResetKeepsExtendedStateIntactInSubmachine() {
 		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		CountListener listener = new CountListener();
 		machine.addStateListener(listener);
 
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count1"), nullValue());
-		assertThat(listener.count1, nullValue());
-		assertThat(listener.count2, nullValue());
-		machine.sendEvent(Events.A);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1, States.S11));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count1"), is(1));
-		assertThat(listener.count1, is(1));
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count1")).isNull();
+		assertThat(listener.count1).isNull();
+		assertThat(listener.count2).isNull();
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1, States.S11);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count1")).isEqualTo(1);
+		assertThat(listener.count1).isEqualTo(1);
 		// listener is called before action is executed
-		assertThat(listener.count2, nullValue());
+		assertThat(listener.count2).isNull();
 
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count2"), nullValue());
-		machine.sendEvent(Events.B);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1, States.S12));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count2"), is(1));
-		assertThat(listener.count1, is(1));
-		assertThat(listener.count2, nullValue());
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count2")).isNull();
+		doSendEventAndConsumeAll(machine, Events.B);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1, States.S12);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count2")).isEqualTo(1);
+		assertThat(listener.count1).isEqualTo(1);
+		assertThat(listener.count2).isNull();
 
-		machine.sendEvent(Events.C);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
-		assertThat(listener.count1, is(1));
-		assertThat(listener.count2, is(1));
+		doSendEventAndConsumeAll(machine, Events.C);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
+		assertThat(listener.count1).isEqualTo(1);
+		assertThat(listener.count2).isEqualTo(1);
 
-		machine.stop();
+		doStopAndAssert(machine);
 		Map<Object, Object> variables = new HashMap<Object, Object>();
 		variables.putAll(machine.getExtendedState().getVariables());
 		ExtendedState extendedState = new DefaultExtendedState(variables);
 		DefaultStateMachineContext<States,Events> stateMachineContext = new DefaultStateMachineContext<States, Events>(States.S0, null, null, extendedState);
 
-		machine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<States,Events>>() {
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
+		doStartAndAssert(machine);
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
-		machine.start();
-
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count1"), is(1));
-		assertThat(listener.count1, is(1));
-		assertThat(listener.count2, is(1));
-		machine.sendEvent(Events.A);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1, States.S11));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count1"), is(2));
-		assertThat(listener.count1, is(2));
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count1")).isEqualTo(1);
+		assertThat(listener.count1).isEqualTo(1);
+		assertThat(listener.count2).isEqualTo(1);
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1, States.S11);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count1")).isEqualTo(2);
+		assertThat(listener.count1).isEqualTo(2);
 		// listener is called before action is executed
-		assertThat(listener.count2, is(1));
+		assertThat(listener.count2).isEqualTo(1);
 
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count2"), is(1));
-		machine.sendEvent(Events.B);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1, States.S12));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("count2"), is(2));
-		assertThat(listener.count1, is(2));
-		assertThat(listener.count2, is(1));
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count2")).isEqualTo(1);
+		doSendEventAndConsumeAll(machine, Events.B);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1, States.S12);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("count2")).isEqualTo(2);
+		assertThat(listener.count1).isEqualTo(2);
+		assertThat(listener.count2).isEqualTo(1);
+	}
+
+	@Test
+	public void testResetFunkyEnumTypes1() throws Exception {
+		context.register(Config6.class);
+		context.refresh();
+
+		StateMachine<MyState, MyEvent> machine = resolveMachine(context);
+
+		DefaultStateMachineContext<MyState, MyEvent> stateMachineContext = new DefaultStateMachineContext<MyState, MyEvent>(
+				SubState.SUB_NEXT, null, null, null);
+
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(SuperState.PARENT, SubState.SUB_NEXT);
+	}
+
+	@Test
+	public void testResetFunkyEnumTypes2() throws Exception {
+		context.register(Config6.class);
+		context.refresh();
+
+		StateMachine<MyState, MyEvent> machine = resolveMachine(context);
+
+		DefaultStateMachineContext<MyState, MyEvent> stateMachineContext = new DefaultStateMachineContext<MyState, MyEvent>(
+				SuperState.INITIAL, null, null, null);
+
+		machine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(stateMachineContext));
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(SuperState.INITIAL);
 	}
 
 	@Configuration
@@ -723,4 +722,107 @@ public class StateMachineResetTests extends AbstractStateMachineTests {
 
 	}
 
+	@Configuration
+	@EnableStateMachine
+	static class Config6 extends StateMachineConfigurerAdapter<MyState, MyEvent> {
+
+		@Override
+		public void configure(final StateMachineStateConfigurer<MyState, MyEvent> states) throws Exception {
+			states
+				.withStates()
+					.end(SuperState.END)
+					.state(SuperState.PARENT)
+					.initial(SuperState.INITIAL)
+					.and()
+				.withStates()
+					.parent(SuperState.PARENT)
+					.initial(SubState.SUB_INITIAL)
+					.state(SubState.SUB_NEXT)
+					.end(SubState.SUB_END);
+		}
+
+		@Override
+		public void configure(final StateMachineTransitionConfigurer<MyState, MyEvent> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source(SuperState.INITIAL)
+					.target(SuperState.PARENT)
+					.event(MyEvent.GO)
+					.and()
+				.withExternal()
+					.source(SuperState.PARENT)
+					.target(SuperState.END)
+					.event(MyEvent.GO)
+					.and()
+				.withExternal()
+					.source(SubState.SUB_INITIAL)
+					.target(SubState.SUB_NEXT)
+					.event(MyEvent.GO)
+					.and()
+				.withExternal()
+					.source(SubState.SUB_NEXT)
+					.target(SubState.SUB_END)
+					.event(MyEvent.GO);
+		}
+	}
+
+	public enum SubState implements MyState {
+		SUB_INITIAL,
+		SUB_NEXT,
+		SUB_END;
+	}
+
+	public enum SuperState implements MyState {
+		INITIAL,
+		PARENT,
+		END;
+	}
+
+	public interface MyState {
+	}
+
+	public enum MyEvent {
+		GO;
+	}
+
+	@Test
+	public void testResetError() {
+		context.register(Config7.class);
+		context.refresh();
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+
+		DefaultStateMachineContext<TestStates, TestEvents> stateMachineContext =
+				new DefaultStateMachineContext<TestStates, TestEvents>(TestStates.S1, null, null, null);
+
+		Stream<Mono<Void>> monos = machine.getStateMachineAccessor().withAllRegions().stream()
+				.map(a -> a.resetStateMachineReactively(stateMachineContext));
+		Mono<Void> resetMono = Flux.fromStream(monos).flatMap(m -> m).next().publishOn(Schedulers.single());
+		StepVerifier.create(resetMono).expectComplete().verify();
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S1);
+	}
+
+	@Configuration
+	@EnableStateMachine
+	static class Config7 extends EnumStateMachineConfigurerAdapter<TestStates, TestEvents> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<TestStates, TestEvents> states) throws Exception {
+			states
+				.withStates()
+					.initial(TestStates.SI)
+					.state(TestStates.S1);
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<TestStates, TestEvents> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source(TestStates.SI)
+					.target(TestStates.S1)
+					.event(TestEvents.E1);
+		}
+
+	}
 }

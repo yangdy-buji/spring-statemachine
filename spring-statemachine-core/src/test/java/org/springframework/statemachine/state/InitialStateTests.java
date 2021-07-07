@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,12 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.EnumSet;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
@@ -43,33 +42,35 @@ public class InitialStateTests extends AbstractStateMachineTests {
 	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testInitialStateTransition() throws Exception {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 	}
 
-	@Test(expected = Exception.class)
+	@Test
 	public void testInitialStateMissingFailure() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
-		context.refresh();
+		assertThatThrownBy(() -> {
+			context.register(Config2.class);
+			context.refresh();
+		}).isInstanceOf(Exception.class);
 	}
 
 	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testInitialNoNeedAsState() throws Exception {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.SI));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 	}
 
 	@Configuration
@@ -147,7 +148,7 @@ public class InitialStateTests extends AbstractStateMachineTests {
 		}
 
 	}
-	
+
 	@Override
 	protected AnnotationConfigApplicationContext buildContext() {
 		return new AnnotationConfigApplicationContext();

@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,9 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
@@ -41,99 +39,99 @@ public class HistoryStateTests extends AbstractStateMachineTests {
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testShallowInSubmachine() {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 		machine.sendEvent(TestEvents.E2);
 		machine.sendEvent(TestEvents.E3);
 		machine.sendEvent(TestEvents.E4);
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S21));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S21);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testShallowNoHistoryDefaultsNormalEntry() {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E4);
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S20));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S20);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testDeep() {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 		machine.sendEvent(TestEvents.E2);
 		machine.sendEvent(TestEvents.E3);
 		machine.sendEvent(TestEvents.E4);
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S21, TestStates.S212));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S21, TestStates.S212);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testShallow() {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 		machine.sendEvent(TestEvents.E2);
 		machine.sendEvent(TestEvents.E3);
 		machine.sendEvent(TestEvents.E4);
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S21, TestStates.S211));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S21, TestStates.S211);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testDefaultNotEntered() {
-		context.register(BaseConfig.class, Config4.class);
+		context.register(Config4.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.EH);
-		assertThat(machine.getState().getIds(), contains(TestStates.S3, TestStates.S33));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S3, TestStates.S33);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testDefaultHistoryIsFinal() {
-		context.register(BaseConfig.class, Config4.class);
+		context.register(Config4.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates.S3, TestStates.S30));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S3, TestStates.S30);
 		machine.sendEvent(TestEvents.EF);
-		assertThat(machine.getState().getIds(), contains(TestStates.S3, TestStates.SF));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S3, TestStates.SF);
 		machine.sendEvent(TestEvents.E4);
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.EH);
-		assertThat(machine.getState().getIds(), contains(TestStates.S3, TestStates.S33));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S3, TestStates.S33);
 	}
 
 	@Configuration

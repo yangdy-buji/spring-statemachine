@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +15,9 @@
  */
 package demo.tasks;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +27,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -61,39 +62,40 @@ public class TasksTests {
 	@Test
 	public void testInitialState() throws InterruptedException {
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(0));
+		assertThat(variables).isEmpty();
 	}
 
 	@Test
 	public void testRunOnce() throws InterruptedException {
 		listener.reset(8, 8, 0);
 		tasks.run();
-		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables).hasSize(3);
 	}
 
 	@Test
 	public void testRunTwice() throws InterruptedException {
 		listener.reset(8, 8, 0);
 		tasks.run();
-		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables).hasSize(3);
 
 		listener.reset(8, 8, 0);
 		tasks.run();
-		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		assertThat(listener.stateEnteredLatch.await(8, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 
 		variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables).hasSize(3);
 	}
 
 	@Test
+	@Tag("smoke")
 	public void testRunSmoke() throws InterruptedException {
 		for (int i = 0; i < 20; i++) {
 			log.info("testRunSmoke SMOKE START " + i);
@@ -102,8 +104,8 @@ public class TasksTests {
 
 			boolean await = listener.stateEnteredLatch.await(8, TimeUnit.SECONDS);
 			String reason = "Machine was " + machine + " " + StringUtils.collectionToCommaDelimitedString(listener.statesEntered);
-			assertThat(reason , await, is(true));
-			assertThat(machine.getState().getIds(), contains(States.READY));
+			assertThat(await).isTrue().withFailMessage(reason);
+			assertThat(machine.getState().getIds()).containsExactly(States.READY);
 			log.info("testRunSmoke SMOKE STOP " + i);
 		}
 	}
@@ -113,9 +115,9 @@ public class TasksTests {
 		listener.reset(10, 0, 0);
 		tasks.fail("T1");
 		tasks.run();
-		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(10));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(10);
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 	}
 
 	@Test
@@ -123,20 +125,20 @@ public class TasksTests {
 		listener.reset(10, 0, 0);
 		tasks.fail("T2");
 		tasks.run();
-		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS)).isTrue();
 
 		Map<Object, Object> variables = machine.getExtendedState().getVariables();
-		assertThat(variables.size(), is(3));
+		assertThat(variables).hasSize(3);
 
-		assertThat(machine.getState().getIds(), contains(States.ERROR, States.MANUAL));
+		assertThat(machine.getState().getIds()).containsExactly(States.ERROR, States.MANUAL);
 		listener.reset(1, 0, 0);
 		tasks.fix();
-		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		assertThat(listener.stateChangedLatch.await(6, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 	}
 
 	@SuppressWarnings("unchecked")
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		context = new AnnotationConfigApplicationContext();
 		context.register(CommonConfiguration.class, Application.class, TestConfig.class);
@@ -144,15 +146,15 @@ public class TasksTests {
 		machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		tasks = context.getBean(Tasks.class);
 		listener = context.getBean(TestListener.class);
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), contains(States.READY));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsExactly(States.READY);
 	}
 
-	@After
+	@AfterEach
 	public void clean() {
-		machine.stop();
+		doStopAndAssert(machine);
 		context.close();
 		context = null;
 		machine = null;

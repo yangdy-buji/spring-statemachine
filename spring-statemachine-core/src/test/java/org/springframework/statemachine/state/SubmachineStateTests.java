@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,16 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
 import org.springframework.statemachine.StateMachine;
@@ -46,7 +42,6 @@ import org.springframework.statemachine.trigger.EventTrigger;
  * Tests for states using a submachine.
  *
  * @author Janne Valkealahti
- *
  */
 public class SubmachineStateTests extends AbstractStateMachineTests {
 
@@ -84,106 +79,104 @@ public class SubmachineStateTests extends AbstractStateMachineTests {
 		transitions.add(transitionFromS1ToS2);
 		transitions.add(transitionFromS2ToS3);
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateSI);
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
 		machine.start();
 
 		StateMachineState<TestStates,TestEvents> state = new StateMachineState<TestStates,TestEvents>(TestStates.S4, machine);
 
-		assertThat(state.isSimple(), is(false));
-		assertThat(state.isComposite(), is(false));
-		assertThat(state.isOrthogonal(), is(false));
-		assertThat(state.isSubmachineState(), is(true));
+		assertThat(state.isSimple()).isFalse();
+		assertThat(state.isComposite()).isFalse();
+		assertThat(state.isOrthogonal()).isFalse();
+		assertThat(state.isSubmachineState()).isTrue();
 
-		assertThat(state.getIds(), contains(TestStates.S4, TestStates.SI));
+		assertThat(state.getIds()).containsExactly(TestStates.S4, TestStates.SI);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testFromSimpleToOtherSubstate() {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 		machine.sendEvent(TestEvents.E2);
 		machine.sendEvent(TestEvents.E3);
 		machine.sendEvent(TestEvents.E4);
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S21));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S21);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testAllSubmachinesRunningInitialsTakesToDeep() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 
-		assertThat(machine.isRunning(), is(true));
+		assertThat(machine.isRunning()).isTrue();
 
 		State<TestStates, TestEvents> s = machine.getState();
 		StateMachine<TestStates, TestEvents> m = ((StateMachineState<TestStates, TestEvents>) s).getSubmachine();
-		boolean r = TestUtils.readField("running", m);
-		assertThat(r, is(true));
+		boolean r = TestUtils.callMethod("isRunning", m);
+		assertThat(r).isTrue();
 
 		s = m.getState();
 		m = ((StateMachineState<TestStates, TestEvents>) s).getSubmachine();
-		r = TestUtils.readField("running", m);
-		assertThat(r, is(true));
+		r = TestUtils.callMethod("isRunning", m);
+		assertThat(r).isTrue();
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S20, TestStates.S2011));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S20, TestStates.S2011);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testAllSubmachinesRunningInitialsNotTakeToDeep() throws Exception {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 
-		assertThat(machine.isRunning(), is(true));
+		assertThat(machine.isRunning()).isTrue();
 
 		State<TestStates, TestEvents> s = machine.getState();
 		StateMachine<TestStates, TestEvents> m = ((StateMachineState<TestStates, TestEvents>) s).getSubmachine();
-		boolean r = TestUtils.readField("running", m);
-		assertThat(r, is(true));
+		boolean r = TestUtils.callMethod("isRunning", m);
+		assertThat(r).isTrue();
 
 		s = m.getState();
 		m = ((StateMachineState<TestStates, TestEvents>) s).getSubmachine();
-		r = TestUtils.readField("running", m);
-		assertThat(r, is(true));
+		r = TestUtils.callMethod("isRunning", m);
+		assertThat(r).isTrue();
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S2, TestStates.S21, TestStates.S212));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2, TestStates.S21, TestStates.S212);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testAllSubmachinesStopped() throws Exception {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
 		machine.sendEvent(TestEvents.E2);
 
-		assertThat(machine.isRunning(), is(true));
+		assertThat(machine.isRunning()).isTrue();
 
 		State<TestStates, TestEvents> s1 = machine.getState();
 		StateMachine<TestStates, TestEvents> m1 = ((StateMachineState<TestStates, TestEvents>) s1).getSubmachine();
@@ -193,12 +186,12 @@ public class SubmachineStateTests extends AbstractStateMachineTests {
 
 		machine.sendEvent(TestEvents.E3);
 
-		boolean r1 = TestUtils.readField("running", m1);
-		assertThat(r1, is(false));
-		boolean r2 = TestUtils.readField("running", m2);
-		assertThat(r2, is(false));
+		boolean r1 = TestUtils.callMethod("isRunning", m1);
+		assertThat(r1).isFalse();
+		boolean r2 = TestUtils.callMethod("isRunning", m2);
+		assertThat(r2).isFalse();
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 	}
 
 	@Configuration

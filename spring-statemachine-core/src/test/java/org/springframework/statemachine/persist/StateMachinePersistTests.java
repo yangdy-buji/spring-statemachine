@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,21 @@
  */
 package org.springframework.statemachine.persist;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.HashMap;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.TestUtils;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
@@ -49,55 +48,53 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		return new AnnotationConfigApplicationContext();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSimplePersist1() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> stateMachine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		stateMachine.start();
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), contains("S2"));
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+
+		doStartAndAssert(stateMachine);
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsExactly("S2");
 
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
 		persister.persist(stateMachine, "xxx");
 		persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), contains("S2"));
+		assertThat(stateMachine.getState().getIds()).containsExactly("S2");
 
-		stateMachine.sendEvent("E2");
-		assertThat(stateMachine.getState().getIds(), contains("S3"));
+		doSendEventAndConsumeAll(stateMachine, "E2");
+		assertThat(stateMachine.getState().getIds()).containsExactly("S3");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSimplePersist2() throws Exception {
 		context.register(Config2.class);
 		context.refresh();
-		StateMachine<TestStates, TestEvents> stateMachine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		stateMachine.start();
-		stateMachine.sendEvent(TestEvents.E1);
-		assertThat(stateMachine.getState().getIds(), contains(TestStates.S2));
+		StateMachine<TestStates, TestEvents> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E1);
+		assertThat(stateMachine.getState().getIds()).containsExactly(TestStates.S2);
 
 		InMemoryStateMachinePersist2 stateMachinePersist = new InMemoryStateMachinePersist2();
 		StateMachinePersister<TestStates, TestEvents, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
 		persister.persist(stateMachine, "xxx");
 		persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), contains(TestStates.S2));
+		assertThat(stateMachine.getState().getIds()).containsExactly(TestStates.S2);
 
-		stateMachine.sendEvent(TestEvents.E2);
-		assertThat(stateMachine.getState().getIds(), contains(TestStates.S3));
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E2);
+		assertThat(stateMachine.getState().getIds()).containsExactly(TestStates.S3);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testExtendedState() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> stateMachine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		stateMachine.start();
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
 
 		stateMachine.getExtendedState().getVariables().put("foo", "bar");
 
@@ -108,69 +105,66 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		stateMachine.getExtendedState().getVariables().remove("foo");
 		stateMachine = persister.restore(stateMachine, "xxx");
 
-		assertThat(stateMachine.getExtendedState().get("foo", String.class), is("bar"));
+		assertThat(stateMachine.getExtendedState().get("foo", String.class)).isEqualTo("bar");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSubStates() throws Exception {
 		context.register(Config3.class);
 		context.refresh();
-		StateMachine<String, String> stateMachine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		stateMachine.start();
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2", "S21"));
-		stateMachine.sendEvent("E3");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2", "S21");
+		doSendEventAndConsumeAll(stateMachine, "E3");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2", "S22");
 
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
 		persister.persist(stateMachine, "xxx");
 		stateMachine = persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2", "S22");
 
-		stateMachine.sendEvent("E2");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S3", "S31"));
+		doSendEventAndConsumeAll(stateMachine, "E2");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S3", "S31");
 
 		stateMachine = persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2", "S22");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testRegions() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		StateMachine<String, String> stateMachine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		stateMachine.start();
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
 
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S11", "S21", "S31"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S11", "S21", "S31");
 
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S12", "S21", "S31"));
-		stateMachine.sendEvent("E2");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S12", "S22", "S31"));
-		stateMachine.sendEvent("E3");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S12", "S22", "S32"));
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S21", "S31");
+		doSendEventAndConsumeAll(stateMachine, "E2");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S31");
+		doSendEventAndConsumeAll(stateMachine, "E3");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
 
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
 		persister.persist(stateMachine, "xxx");
 		stateMachine = persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S12", "S22", "S32"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
 
-		stateMachine.sendEvent("E4");
-		stateMachine.sendEvent("E5");
-		stateMachine.sendEvent("E6");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S13", "S23", "S33"));
+		doSendEventAndConsumeAll(stateMachine, "E4");
+		doSendEventAndConsumeAll(stateMachine, "E5");
+		doSendEventAndConsumeAll(stateMachine, "E6");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S13", "S23", "S33");
 
 		stateMachine = persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S12", "S22", "S32"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSubsInRegions1() throws Exception {
 		context.register(Config51.class, Config52.class);
@@ -179,31 +173,30 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
-		StateMachine<String, String> stateMachine1 = context.getBean("machine1", StateMachine.class);
-		StateMachine<String, String> stateMachine2 = context.getBean("machine2", StateMachine.class);
-		stateMachine1.start();
+		StateMachine<String, String> stateMachine1 = resolveMachine("machine1", context);
+		StateMachine<String, String> stateMachine2 = resolveMachine("machine2", context);
+		doStartAndAssert(stateMachine1);
 
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S11", "S111", "S21"));
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S11", "S111", "S21");
 		persister.persist(stateMachine1, "xxx");
 		stateMachine2 = persister.restore(stateMachine2, "xxx");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S11", "S111", "S21"));
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S11", "S111", "S21");
 
-		stateMachine1.sendEvent("E1");
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S12", "S21"));
+		doSendEventAndConsumeAll(stateMachine1, "E1");
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S12", "S21");
 		persister.persist(stateMachine1, "xxx");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S11", "S111", "S21"));
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S11", "S111", "S21");
 		stateMachine2 = persister.restore(stateMachine2, "xxx");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S12", "S21"));
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S12", "S21");
 
-		stateMachine1.sendEvent("E2");
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S12", "S22", "S221"));
+		doSendEventAndConsumeAll(stateMachine1, "E2");
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S12", "S22", "S221");
 		persister.persist(stateMachine1, "xxx");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S12", "S21"));
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S12", "S21");
 		stateMachine2 = persister.restore(stateMachine2, "xxx");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S12", "S22", "S221"));
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S12", "S22", "S221");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSubsInRegions2() throws Exception {
 			context.register(Config51.class, Config52.class);
@@ -212,22 +205,21 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 			InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 			StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
-			StateMachine<String, String> stateMachine1 = context.getBean("machine1", StateMachine.class);
-			StateMachine<String, String> stateMachine2 = context.getBean("machine2", StateMachine.class);
-			stateMachine1.start();
+			StateMachine<String, String> stateMachine1 = resolveMachine("machine1", context);
+			StateMachine<String, String> stateMachine2 = resolveMachine("machine2", context);
+			doStartAndAssert(stateMachine1);
 
-			stateMachine1.sendEvent("E1");
-			assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S12", "S21"));
-			stateMachine1.sendEvent("E2");
-			assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S12", "S22", "S221"));
-			stateMachine1.sendEvent("E3");
-			assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S12", "S22", "S222"));
+			doSendEventAndConsumeAll(stateMachine1, "E1");
+			assertThat(stateMachine1.getState().getIds()).containsOnly("S12", "S21");
+			doSendEventAndConsumeAll(stateMachine1, "E2");
+			assertThat(stateMachine1.getState().getIds()).containsOnly("S12", "S22", "S221");
+			doSendEventAndConsumeAll(stateMachine1, "E3");
+			assertThat(stateMachine1.getState().getIds()).containsOnly("S12", "S22", "S222");
 			persister.persist(stateMachine1, "xxx");
 			stateMachine2 = persister.restore(stateMachine2, "xxx");
-			assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S12", "S22", "S222"));
+			assertThat(stateMachine2.getState().getIds()).containsOnly("S12", "S22", "S222");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHistoryFlatShallow() throws Exception {
 		// not sure if this test makes any sense as it was done for
@@ -239,26 +231,25 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
-		StateMachine<String, String> stateMachine1 = context.getBean("machine1", StateMachine.class);
-		StateMachine<String, String> stateMachine2 = context.getBean("machine2", StateMachine.class);
+		StateMachine<String, String> stateMachine1 = resolveMachine("machine1", context);
+		StateMachine<String, String> stateMachine2 = resolveMachine("machine2", context);
 		// start gets in state S1
-		stateMachine1.start();
+		doStartAndAssert(stateMachine1);
 
 		// event E1 takes into state S2
-		stateMachine1.sendEvent("E1");
-		assertThat(stateMachine1.getState().getIds(), contains("S2"));
+		doSendEventAndConsumeAll(stateMachine1, "E1");
+		assertThat(stateMachine1.getState().getIds()).containsExactly("S2");
 		Object history = readHistoryState(stateMachine1);
-		assertThat(history, is("S2"));
+		assertThat(history).isEqualTo("S2");
 
 		// we persist with state S2 and history keeps same S2
 		persister.persist(stateMachine1, "xxx");
 
 		stateMachine2 = persister.restore(stateMachine2, "xxx");
 		history = readHistoryState(stateMachine2);
-		assertThat(history, is("S2"));
+		assertThat(history).isEqualTo("S2");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHistorySubShallow() throws Exception {
 		// not sure if this test makes any sense as it was done for
@@ -270,30 +261,30 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
 
-		StateMachine<String, String> stateMachine1 = context.getBean("machine1", StateMachine.class);
-		StateMachine<String, String> stateMachine2 = context.getBean("machine2", StateMachine.class);
-		stateMachine1.start();
+		StateMachine<String, String> stateMachine1 = resolveMachine("machine1", context);
+		StateMachine<String, String> stateMachine2 = resolveMachine("machine2", context);
+		doStartAndAssert(stateMachine1);
 
-		stateMachine1.sendEvent("E1");
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doSendEventAndConsumeAll(stateMachine1, "E1");
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S2", "S21");
 
-		stateMachine1.sendEvent("E3");
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		doSendEventAndConsumeAll(stateMachine1, "E3");
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S2", "S22");
 		persister.persist(stateMachine1, "xxx");
 
-		stateMachine1.sendEvent("E2");
-		assertThat(stateMachine1.getState().getIds(), containsInAnyOrder("S1"));
+		doSendEventAndConsumeAll(stateMachine1, "E2");
+		assertThat(stateMachine1.getState().getIds()).containsOnly("S1");
 
 
 		stateMachine2 = persister.restore(stateMachine2, "xxx");
 		Object history = TestUtils.readField("history", stateMachine1);
-		assertThat(history, notNullValue());
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		assertThat(history).isNotNull();
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S2", "S22");
 
-		stateMachine2.sendEvent("E2");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S1"));
-		stateMachine2.sendEvent("EH3");
-		assertThat(stateMachine2.getState().getIds(), containsInAnyOrder("S2", "S22"));
+		doSendEventAndConsumeAll(stateMachine2, "E2");
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S1");
+		doSendEventAndConsumeAll(stateMachine2, "EH3");
+		assertThat(stateMachine2.getState().getIds()).containsOnly("S2", "S22");
 	}
 
 	@Test
@@ -302,25 +293,56 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 		context.refresh();
 		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
-		@SuppressWarnings("unchecked")
-		StateMachineFactory<String, String> stateMachineFactory = context.getBean(StateMachineFactory.class);
+		StateMachineFactory<String, String> stateMachineFactory = resolveFactory(context);
 
 		StateMachine<String,String> stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getState().getIds()).containsOnly("S1");
 
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2"));
-		assertThat(stateMachine.isComplete(), is(true));
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2");
+		assertThat(stateMachine.isComplete()).isTrue();
 
 		persister.persist(stateMachine, "xxx");
 
 		stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S1");
 
 		stateMachine = persister.restore(stateMachine, "xxx");
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2"));
-		assertThat(stateMachine.isComplete(), is(true));
+		assertThat(stateMachine.getState().getIds()).containsOnly("S2");
+		assertThat(stateMachine.isComplete()).isTrue();
+	}
+
+	@Test
+	public void testRegions2() throws Exception {
+		context.register(Config9.class);
+		context.refresh();
+		StateMachine<String, String> stateMachine = resolveMachine(context);
+		doStartAndAssert(stateMachine);
+
+		assertThat(stateMachine.getState().getIds()).containsOnly("S11", "S21", "S31");
+
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S21", "S31");
+		doSendEventAndConsumeAll(stateMachine, "E2");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S31");
+		doSendEventAndConsumeAll(stateMachine, "E3");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
+
+		InMemoryStateMachinePersist1 stateMachinePersist = new InMemoryStateMachinePersist1();
+		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<>(stateMachinePersist);
+
+		persister.persist(stateMachine, "xxx");
+		stateMachine = persister.restore(stateMachine, "xxx");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
+
+		doSendEventAndConsumeAll(stateMachine, "E4");
+		doSendEventAndConsumeAll(stateMachine, "E5");
+		doSendEventAndConsumeAll(stateMachine, "E6");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S13", "S23", "S33");
+
+		stateMachine = persister.restore(stateMachine, "xxx");
+		assertThat(stateMachine.getState().getIds()).containsOnly("S12", "S22", "S32");
 	}
 
 	@Configuration
@@ -682,6 +704,67 @@ public class StateMachinePersistTests extends AbstractStateMachineTests {
 					.source("S1")
 					.target("S2")
 					.event("E1");
+		}
+	}
+
+	@Configuration
+	@EnableStateMachine
+	static class Config9 extends StateMachineConfigurerAdapter<String, String> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("S11")
+					.state("S11")
+					.state("S12")
+					.state("S13")
+					.and()
+				.withStates()
+					.initial("S21")
+					.state("S21")
+					.state("S22")
+					.state("S23")
+					.and()
+				.withStates()
+					.initial("S31")
+					.state("S31")
+					.state("S32")
+					.state("S33");
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("S11")
+					.target("S12")
+					.event("E1")
+					.and()
+				.withExternal()
+					.source("S21")
+					.target("S22")
+					.event("E2")
+					.and()
+				.withExternal()
+					.source("S31")
+					.target("S32")
+					.event("E3")
+					.and()
+				.withExternal()
+					.source("S12")
+					.target("S13")
+					.event("E4")
+					.and()
+				.withExternal()
+					.source("S22")
+					.target("S23")
+					.event("E5")
+					.and()
+				.withExternal()
+					.source("S32")
+					.target("S33")
+					.event("E6");
 		}
 	}
 

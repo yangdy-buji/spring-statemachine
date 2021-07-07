@@ -12,8 +12,12 @@ build
 metastore_db
 /src/test/resources/s3.properties
 /.idea/
+/.vscode/
 .DS_Store
-/out/
+out
 target
 classes
 .sts4-cache
+.attach_pid*
+nexus
+.jfrog

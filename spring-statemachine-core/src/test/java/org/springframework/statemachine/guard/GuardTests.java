@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +15,14 @@
  */
 package org.springframework.statemachine.guard;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests.TestAction;
 import org.springframework.statemachine.AbstractStateMachineTests.TestEvents;
 import org.springframework.statemachine.AbstractStateMachineTests.TestGuard;
@@ -56,13 +51,13 @@ public class GuardTests {
 				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		TestGuard testGuard = ctx.getBean("testGuard", TestGuard.class);
 		TestAction testAction = ctx.getBean("testAction", TestAction.class);
-		assertThat(testGuard, notNullValue());
-		assertThat(testAction, notNullValue());
+		assertThat(testGuard).isNotNull();
+		assertThat(testAction).isNotNull();
 
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(testGuard.onEvaluateLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(testGuard.onEvaluateLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
 
 		ctx.close();
 	}
@@ -75,16 +70,16 @@ public class GuardTests {
 				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		TestGuard testGuard = ctx.getBean("testGuard", TestGuard.class);
 		TestAction testAction = ctx.getBean("testAction", TestAction.class);
-		assertThat(testGuard, notNullValue());
-		assertThat(testAction, notNullValue());
+		assertThat(testGuard).isNotNull();
+		assertThat(testAction).isNotNull();
 
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
 		machine.sendEvent(TestEvents.E1);
-		assertThat(testGuard.onEvaluateLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction.onExecuteLatch.await(2, TimeUnit.SECONDS), is(false));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(testGuard.onEvaluateLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction.onExecuteLatch.await(2, TimeUnit.SECONDS)).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
 		ctx.close();
 	}
@@ -96,13 +91,13 @@ public class GuardTests {
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.E2);
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 		machine.sendEvent(TestEvents.E3);
-		assertThat(machine.getState().getIds(), contains(TestStates.S2));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2);
 		ctx.close();
 	}
 
@@ -139,12 +134,6 @@ public class GuardTests {
 		public TestGuard testGuard() {
 			return new TestGuard(true);
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration
@@ -180,12 +169,6 @@ public class GuardTests {
 		public TestAction testAction() {
 			return new TestAction();
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration

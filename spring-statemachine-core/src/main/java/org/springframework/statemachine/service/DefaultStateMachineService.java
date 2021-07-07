@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,8 +28,6 @@ import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachineException;
 import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.util.Assert;
@@ -84,8 +82,10 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 	@Override
 	public StateMachine<S, E> acquireStateMachine(String machineId, boolean start) {
 		log.info("Acquiring machine with id " + machineId);
+		StateMachine<S, E> stateMachine;
+		// naive sync to handle concurrency with release
 		synchronized (machines) {
-			StateMachine<S,E> stateMachine = machines.get(machineId);
+			stateMachine = machines.get(machineId);
 			if (stateMachine == null) {
 				log.info("Getting new machine from factory with id " + machineId);
 				stateMachine = stateMachineFactory.getStateMachine(machineId);
@@ -100,8 +100,9 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 				}
 				machines.put(machineId, stateMachine);
 			}
-			return handleStart(stateMachine, start);
 		}
+		// handle start outside of sync as it might take some time and would block other machines acquire
+		return handleStart(stateMachine, start);
 	}
 
 	@Override
@@ -111,7 +112,7 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 			StateMachine<S, E> stateMachine = machines.remove(machineId);
 			if (stateMachine != null) {
 				log.info("Found machine with id " + machineId);
-				stateMachine.stop();
+				stateMachine.stopReactively().block();
 			}
 		}
 	}
@@ -125,6 +126,18 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 				log.info("Found machine with id " + machineId);
 				handleStop(stateMachine, stop);
 			}
+		}
+	}
+
+	/**
+	 * Determines if the given machine identifier denotes a known managed state machine.
+	 *
+	 * @param machineId machine identifier
+	 * @return true if machineId denotes a known managed state machine currently in memory
+	 */
+	public boolean hasStateMachine(String machineId) {
+		synchronized (machines) {
+			return machines.containsKey(machineId);
 		}
 	}
 
@@ -151,14 +164,9 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 		if (stateMachineContext == null) {
 			return stateMachine;
 		}
-		stateMachine.stop();
-		stateMachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<S, E>>() {
-
-			@Override
-			public void apply(StateMachineAccess<S, E> function) {
-				function.resetStateMachine(stateMachineContext);
-			}
-		});
+		stateMachine.stopReactively().block();
+		// only go via top region
+		stateMachine.getStateMachineAccessor().doWithRegion(function -> function.resetStateMachine(stateMachineContext));
 		return stateMachine;
 	}
 
@@ -167,7 +175,7 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 			if (!((Lifecycle) stateMachine).isRunning()) {
 				StartListener<S, E> listener = new StartListener<>(stateMachine);
 				stateMachine.addStateListener(listener);
-				stateMachine.start();
+				stateMachine.startReactively().block();
 				try {
 					listener.latch.await();
 				} catch (InterruptedException e) {
@@ -182,7 +190,7 @@ public class DefaultStateMachineService<S, E> implements StateMachineService<S, 
 			if (((Lifecycle) stateMachine).isRunning()) {
 				StopListener<S, E> listener = new StopListener<>(stateMachine);
 				stateMachine.addStateListener(listener);
-				stateMachine.stop();
+				stateMachine.stopReactively().block();
 				try {
 					listener.latch.await();
 				} catch (InterruptedException e) {

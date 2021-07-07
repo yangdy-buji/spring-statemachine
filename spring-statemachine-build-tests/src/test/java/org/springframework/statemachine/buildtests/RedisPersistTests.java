@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,13 @@
  */
 package org.springframework.statemachine.buildtests;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
+import static org.springframework.statemachine.TestUtils.resolvePersister;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,21 +29,19 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.buildtests.tck.redis.RedisRule;
+import org.springframework.statemachine.buildtests.tck.redis.EnabledOnRedis;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
+import org.springframework.statemachine.data.redis.RedisStateMachineContextRepository;
+import org.springframework.statemachine.data.redis.RedisStateMachinePersister;
 import org.springframework.statemachine.persist.RepositoryStateMachinePersist;
 import org.springframework.statemachine.persist.StateMachinePersister;
-import org.springframework.statemachine.redis.RedisStateMachineContextRepository;
-import org.springframework.statemachine.redis.RedisStateMachinePersister;
 
+@EnabledOnRedis
 public class RedisPersistTests extends AbstractBuildTests {
-
-	@Rule
-	public RedisRule redisAvailableRule = new RedisRule();
 
 	@Override
 	protected AnnotationConfigApplicationContext buildContext() {
@@ -52,55 +49,54 @@ public class RedisPersistTests extends AbstractBuildTests {
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testPersistRegions() throws Exception {
 		context.register(RedisConfig.class, Config1.class);
 		context.refresh();
 
-		StateMachineFactory<TestStates, TestEvents> stateMachineFactory = context.getBean(StateMachineFactory.class);
-		StateMachinePersister<TestStates, TestEvents, String> persister = context.getBean(StateMachinePersister.class);
-
+		StateMachineFactory<TestStates, TestEvents> stateMachineFactory = resolveFactory(context);
+		StateMachinePersister<TestStates, TestEvents, String> persister = resolvePersister(context);
 		StateMachine<TestStates, TestEvents> stateMachine = stateMachineFactory.getStateMachine("testid");
-		stateMachine.start();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), is("testid"));
 
-		stateMachine.sendEvent(TestEvents.E1);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20, TestStates.S30));
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isEqualTo("testid");
+
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E1);
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20, TestStates.S30);
 		persister.persist(stateMachine, "xxx1");
 
-		stateMachine.sendEvent(TestEvents.E2);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S30));
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E2);
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S30);
 		persister.persist(stateMachine, "xxx2");
 
-		stateMachine.sendEvent(TestEvents.E3);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S4));
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E3);
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S4);
 		persister.persist(stateMachine, "xxx3");
 
 		stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), nullValue());
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isNull();
 		stateMachine = persister.restore(stateMachine, "xxx1");
-		assertThat(stateMachine.getId(), is("testid"));
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20, TestStates.S30));
-		stateMachine.sendEvent(TestEvents.E2);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S30));
+		assertThat(stateMachine.getId()).isEqualTo("testid");
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20, TestStates.S30);
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E2);
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S30);
 
 		stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), nullValue());
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isNull();
 		stateMachine = persister.restore(stateMachine, "xxx2");
-		assertThat(stateMachine.getId(), is("testid"));
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S30));
-		stateMachine.sendEvent(TestEvents.E3);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S4));
+		assertThat(stateMachine.getId()).isEqualTo("testid");
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S30);
+		doSendEventAndConsumeAll(stateMachine, TestEvents.E3);
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S4);
 
 		stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), nullValue());
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isNull();
 		stateMachine = persister.restore(stateMachine, "xxx3");
-		assertThat(stateMachine.getId(), is("testid"));
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(TestStates.S4));
+		assertThat(stateMachine.getId()).isEqualTo("testid");
+		assertThat(stateMachine.getState().getIds()).containsOnly(TestStates.S4);
 	}
 
 	@Configuration

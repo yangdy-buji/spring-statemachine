@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,16 @@
  */
 package org.springframework.statemachine.docs;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
@@ -39,13 +39,12 @@ public class DocsConfigurationSampleTests10 extends AbstractStateMachineTests {
 	public void testConfig1() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S1"));
-		assertThat(machine.getId(), is("mymachine"));
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2"));
+		StateMachine<String, String> machine = resolveMachine(context);
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		assertThat(machine.getId()).isEqualTo("mymachine");
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2");
 	}
 
 	@Test
@@ -57,11 +56,11 @@ public class DocsConfigurationSampleTests10 extends AbstractStateMachineTests {
 		StateMachineFactory<String, String> factory = context.getBean(StateMachineFactory.class);
 		StateMachine<String, String> machine = factory.getStateMachine("mymachine");
 // end::snippetB[]
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S1"));
-		assertThat(machine.getId(), is("mymachine"));
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2"));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		assertThat(machine.getId()).isEqualTo("mymachine");
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2");
 	}
 
 	@Configuration

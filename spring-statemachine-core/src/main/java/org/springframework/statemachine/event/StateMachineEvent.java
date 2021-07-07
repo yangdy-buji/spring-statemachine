@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package org.springframework.statemachine.event;
 import org.springframework.context.ApplicationEvent;
 
 /**
- * Base {@link ApplicationEvent} class for statemachine events. All custom event
+ * Base {@link ApplicationEvent} class for leader based events. All custom event
  * classes should be derived from this class.
  *
  * @author Janne Valkealahti

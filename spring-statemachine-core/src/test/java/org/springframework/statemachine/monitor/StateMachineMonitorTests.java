@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,24 @@
  */
 package org.springframework.statemachine.monitor;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
@@ -41,35 +41,36 @@ import org.springframework.statemachine.config.builders.StateMachineStateConfigu
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.transition.Transition;
 
+import reactor.core.publisher.Mono;
+
 public class StateMachineMonitorTests extends AbstractStateMachineTests {
 
-	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testSimpleMonitor() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 
 		TestStateMachineMonitor monitor = context.getBean(TestStateMachineMonitor.class);
-		Action<String, String> taction = context.getBean("taction", Action.class);
-		Action<String, String> enaction = context.getBean("enaction", Action.class);
-		Action<String, String> exaction = context.getBean("exaction", Action.class);
 		LatchAction saction = context.getBean("saction", LatchAction.class);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains("S1"));
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), contains("S2"));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly("S1");
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsExactly("S2");
 		// there's also initial transition, thus 2 instead 1
-		assertThat(monitor.transitions.size(), is(2));
-		assertThat(saction.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(monitor.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(monitor.actions.size(), is(4));
-		assertThat(monitor.actions.keySet(), containsInAnyOrder(taction, enaction, exaction, saction));
+		assertThat(monitor.transitions).hasSize(2);
+		assertThat(saction.latch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(monitor.latch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(monitor.actions).hasSize(4);
+		// TODO: REACTOR yeah we wrap action internally so can't match like this anymore
+		// Action<String, String> taction = context.getBean("taction", Action.class);
+		// Action<String, String> enaction = context.getBean("enaction", Action.class);
+		// Action<String, String> exaction = context.getBean("exaction", Action.class);
+		// assertThat(monitor.actions.keySet()).containsOnly(taction, enaction, exaction, saction);
 		monitor.reset();
-		machine.sendEvent("E2");
-		assertThat(machine.getState().getIds(), contains("S1"));
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(machine.getState().getIds()).containsExactly("S1");
 	}
 
 	@Configuration
@@ -181,7 +182,7 @@ public class StateMachineMonitorTests extends AbstractStateMachineTests {
 	private static class TestStateMachineMonitor extends AbstractStateMachineMonitor<String, String> {
 
 		Map<Transition<String, String>, Transitions> transitions = new HashMap<>();
-		Map<Action<String, String>, Actions> actions = new HashMap<>();
+		Map<Function<StateContext<String, String>, Mono<Void>>, Actions> actions = new HashMap<>();
 		CountDownLatch latch = new CountDownLatch(4);
 
 		@Override
@@ -190,8 +191,8 @@ public class StateMachineMonitorTests extends AbstractStateMachineTests {
 		}
 
 		@Override
-		public void action(StateMachine<String, String> stateMachine, Action<String, String> action,
-				long duration) {
+		public void action(StateMachine<String, String> stateMachine,
+				Function<StateContext<String, String>, Mono<Void>> action, long duration) {
 			actions.put(action, new Actions(action, duration));
 			latch.countDown();
 		}
@@ -214,9 +215,9 @@ public class StateMachineMonitorTests extends AbstractStateMachineTests {
 		}
 		@SuppressWarnings("unused")
 		static class Actions {
-			Action<String, String> action;
+			Function<StateContext<String, String>, Mono<Void>> action;
 			Long duration;
-			public Actions(Action<String, String> action, Long duration) {
+			public Actions(Function<StateContext<String, String>, Mono<Void>> action, Long duration) {
 				this.action = action;
 				this.duration = duration;
 			}

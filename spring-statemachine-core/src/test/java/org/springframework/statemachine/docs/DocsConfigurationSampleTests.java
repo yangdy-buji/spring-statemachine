@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,24 +18,23 @@ package org.springframework.statemachine.docs;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.action.SpelExpressionAction;
@@ -58,11 +57,15 @@ import org.springframework.statemachine.event.OnStateMachineError;
 import org.springframework.statemachine.event.StateMachineEvent;
 import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.StateMachineInterceptor;
 import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.statemachine.transition.TransitionConflictPolicy;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Tests for state machine configuration.
@@ -436,8 +439,6 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 			.withConfiguration()
 				.autoStartup(false)
 				.beanFactory(null)
-				.taskExecutor(null)
-				.taskScheduler(null)
 				.listener(null);
 		return builder.build();
 	}
@@ -547,7 +548,7 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 		void method() {
 			StateMachine<States,Events> stateMachine = factory.getStateMachine();
-			stateMachine.start();
+			stateMachine.startReactively().subscribe();
 		}
 	}
 // end::snippetL[]
@@ -586,19 +587,50 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 // tag::snippetO[]
 		@Autowired
-		StateMachine<States, Events> stateMachine;
+		StateMachine<String, String> stateMachine;
 
 		void signalMachine() {
-			stateMachine.sendEvent(Events.E1);
+			stateMachine
+				.sendEvent(Mono.just(MessageBuilder
+					.withPayload("E1").build()))
+				.subscribe();
 
-			Message<Events> message = MessageBuilder
-					.withPayload(Events.E2)
+			Message<String> message = MessageBuilder
+					.withPayload("E2")
 					.setHeader("foo", "bar")
 					.build();
-			stateMachine.sendEvent(message);
+			stateMachine.sendEvent(Mono.just(message)).subscribe();
 		}
 // end::snippetO[]
 
+		void signalMachine2() {
+// tag::snippetO2[]
+			Message<String> message1 = MessageBuilder
+				.withPayload("E1")
+				.build();
+			Message<String> message2 = MessageBuilder
+				.withPayload("E2")
+				.build();
+
+			Flux<StateMachineEventResult<String, String>> results =
+				stateMachine.sendEvents(Flux.just(message1, message2));
+
+			results.subscribe();
+// end::snippetO2[]
+		}
+
+		void signalMachine3() {
+// tag::snippetO3[]
+			Message<String> message1 = MessageBuilder
+				.withPayload("E1")
+				.build();
+
+			Mono<List<StateMachineEventResult<String, String>>> results =
+				stateMachine.sendEventCollect(Mono.just(message1));
+
+			results.subscribe();
+// end::snippetO3[]
+		}
 	}
 
 // tag::snippetP[]
@@ -630,6 +662,38 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 	}
 // end::snippetP[]
+
+// tag::snippetPP[]
+	@Configuration
+	@EnableStateMachine
+	public class Config10RegionId
+			extends EnumStateMachineConfigurerAdapter<States2, Events> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<States2, Events> states)
+				throws Exception {
+			states
+				.withStates()
+					.initial(States2.S1)
+					.state(States2.S2)
+					.and()
+					.withStates()
+						.parent(States2.S2)
+						.region("R1")
+						.initial(States2.S2I)
+						.state(States2.S21)
+						.end(States2.S2F)
+						.and()
+					.withStates()
+						.parent(States2.S2)
+						.region("R2")
+						.initial(States2.S3I)
+						.state(States2.S31)
+						.end(States2.S3F);
+		}
+
+	}
+// end::snippetPP[]
 
 // tag::snippetQ[]
 	@Configuration
@@ -1157,10 +1221,9 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 						.autoStartup(true)
 						.machineId("myMachineId")
 						.beanFactory(new StaticListableBeanFactory())
-						.taskExecutor(new SyncTaskExecutor())
-						.taskScheduler(new ConcurrentTaskScheduler())
 						.listener(new StateMachineListenerAdapter<States, Events>())
-						.transitionConflictPolicy(TransitionConflictPolicy.CHILD);
+						.transitionConflictPolicy(TransitionConflictPolicy.CHILD)
+						.regionExecutionPolicy(RegionExecutionPolicy.PARALLEL);
 			}
 		}
 // end::snippetYA[]
@@ -1222,13 +1285,7 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 			void s1() {
 // tag::snippetZA[]
-				stateMachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<String,String>>() {
-
-					@Override
-					public void apply(StateMachineAccess<String, String> function) {
-						function.setRelay(stateMachine);
-					}
-				});
+				stateMachine.getStateMachineAccessor().doWithAllRegions(function -> function.setRelay(stateMachine));
 
 				stateMachine.getStateMachineAccessor()
 					.doWithAllRegions(access -> access.setRelay(stateMachine));
@@ -1237,13 +1294,7 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 			void s2() {
 // tag::snippetZB[]
-				stateMachine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<String,String>>() {
-
-					@Override
-					public void apply(StateMachineAccess<String, String> function) {
-						function.setRelay(stateMachine);
-					}
-				});
+				stateMachine.getStateMachineAccessor().doWithRegion(function -> function.setRelay(stateMachine));
 
 				stateMachine.getStateMachineAccessor()
 					.doWithRegion(access -> access.setRelay(stateMachine));
@@ -1291,7 +1342,8 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 						@Override
 						public void preStateChange(State<String, String> state, Message<String> message,
-								Transition<String, String> transition, StateMachine<String, String> stateMachine) {
+								Transition<String, String> transition, StateMachine<String, String> stateMachine,
+								StateMachine<String, String> rootStateMachine) {
 						}
 
 						@Override
@@ -1301,7 +1353,8 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 						@Override
 						public void postStateChange(State<String, String> state, Message<String> message,
-								Transition<String, String> transition, StateMachine<String, String> stateMachine) {
+								Transition<String, String> transition, StateMachine<String, String> stateMachine,
+								StateMachine<String, String> rootStateMachine) {
 						}
 
 						@Override
@@ -1323,21 +1376,15 @@ public class DocsConfigurationSampleTests extends AbstractStateMachineTests {
 
 			void addInterceptor() {
 				stateMachine.getStateMachineAccessor()
-					.doWithRegion(new StateMachineFunction<StateMachineAccess<String, String>>() {
-
-					@Override
-					public void apply(StateMachineAccess<String, String> function) {
-						function.addStateMachineInterceptor(
-								new StateMachineInterceptorAdapter<String, String>() {
-							@Override
-							public Exception stateMachineError(StateMachine<String, String> stateMachine,
-									Exception exception) {
-								// return null indicating handled error
-								return exception;
-							}
-						});
-					}
-				});
+						.doWithRegion(function ->
+							function.addStateMachineInterceptor(new StateMachineInterceptorAdapter<String, String>() {
+								@Override
+								public Exception stateMachineError(StateMachine<String, String> stateMachine,
+																   Exception exception) {
+									return exception;
+								}
+							})
+						);
 
 			}
 // end::snippet1[]

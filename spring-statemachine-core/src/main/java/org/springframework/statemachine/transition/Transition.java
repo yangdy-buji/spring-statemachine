@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,16 @@
  */
 package org.springframework.statemachine.transition;
 
+import java.util.Collection;
+import java.util.function.Function;
+
 import org.springframework.statemachine.StateContext;
-import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.action.ActionListener;
-import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.trigger.Trigger;
 
-import java.util.Collection;
+import reactor.core.publisher.Mono;
 
 /**
  * {@code Transition} is something what a state machine associates with a state
@@ -40,16 +41,17 @@ public interface Transition<S, E> {
 	 * Transit this transition with a give state context.
 	 *
 	 * @param context the state context
-	 * @return true, if transition happened, false otherwise
+	 * @return Mono for completion with true, if transition happened, false otherwise
 	 */
-	boolean transit(StateContext<S, E> context);
+	Mono<Boolean> transit(StateContext<S, E> context);
 
 	/**
 	 * Execute transition actions.
 	 *
 	 * @param context the state context
+	 * @return mono for completion
 	 */
-	void executeTransitionActions(StateContext<S, E> context);
+	Mono<Void> executeTransitionActions(StateContext<S, E> context);
 
 	/**
 	 * Gets the source state of this transition.
@@ -70,14 +72,14 @@ public interface Transition<S, E> {
 	 *
 	 * @return the guard
 	 */
-	Guard<S, E> getGuard();
+	Function<StateContext<S, E>, Mono<Boolean>> getGuard();
 
 	/**
 	 * Gets the transition actions.
 	 *
 	 * @return the transition actions
 	 */
-	Collection<Action<S, E>> getActions();
+	Collection<Function<StateContext<S, E>, Mono<Void>>> getActions();
 
 	/**
 	 * Gets the transition trigger.

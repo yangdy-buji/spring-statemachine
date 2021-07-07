@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 package org.springframework.statemachine.config;
 
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineException;
 import org.springframework.statemachine.config.builders.StateMachineConfigBuilder;
@@ -31,10 +29,7 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionBu
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.config.common.annotation.AnnotationBuilder;
 import org.springframework.statemachine.config.common.annotation.ObjectPostProcessor;
-import org.springframework.statemachine.config.model.DefaultStateMachineModel;
 import org.springframework.statemachine.config.model.ConfigurationData;
-import org.springframework.statemachine.config.model.StatesData;
-import org.springframework.statemachine.config.model.TransitionsData;
 
 /**
  * {@code StateMachineBuilder} provides a builder pattern for
@@ -114,50 +109,40 @@ public class StateMachineBuilder {
 		}
 
 		/**
-		 * Builds a {@link StateMachine}.
+		 * Creates a {@link StateMachineFactory} from builder
 		 *
-		 * @return the state machine
+		 * @return the factory to create a state machine
 		 */
-		public StateMachine<S, E> build() {
+		public StateMachineFactory<S, E> createFactory() {
 			try {
 				builder.apply(adapter);
-				StateMachineConfig<S, E> stateMachineConfig = builder.getOrBuild();
 
-				TransitionsData<S, E> stateMachineTransitions = stateMachineConfig.getTransitions();
-				StatesData<S, E> stateMachineStates = stateMachineConfig.getStates();
-				ConfigurationData<S, E> stateMachineConfigurationConfig = stateMachineConfig.getStateMachineConfigurationConfig();
-
-				ObjectStateMachineFactory<S, E> stateMachineFactory = null;
-				if (stateMachineConfig.getModel() != null && stateMachineConfig.getModel().getFactory() != null) {
-					stateMachineFactory = new ObjectStateMachineFactory<S, E>(
-							new DefaultStateMachineModel<S, E>(stateMachineConfigurationConfig, null, null),
-							stateMachineConfig.getModel().getFactory());
-				} else {
-					stateMachineFactory = new ObjectStateMachineFactory<S, E>(new DefaultStateMachineModel<S, E>(
-							stateMachineConfigurationConfig, stateMachineStates, stateMachineTransitions), null);
-				}
+				ObjectStateMachineFactory<S, E> stateMachineFactory = StateMachineFactory.create(builder);
+				ConfigurationData<S, E> stateMachineConfigurationConfig = builder.getOrBuild().stateMachineConfigurationConfig;
 
 				stateMachineFactory.setHandleAutostartup(stateMachineConfigurationConfig.isAutoStart());
 
 				if (stateMachineConfigurationConfig.getBeanFactory() != null) {
 					stateMachineFactory.setBeanFactory(stateMachineConfigurationConfig.getBeanFactory());
 				}
-				if (stateMachineConfigurationConfig.getTaskExecutor() != null) {
-					stateMachineFactory.setTaskExecutor(stateMachineConfigurationConfig.getTaskExecutor());
-				} else {
-					stateMachineFactory.setTaskExecutor(new SyncTaskExecutor());
-				}
-				if (stateMachineConfigurationConfig.getTaskScheduler() != null) {
-					stateMachineFactory.setTaskScheduler(stateMachineConfigurationConfig.getTaskScheduler());
-				} else {
-					stateMachineFactory.setTaskScheduler(new ConcurrentTaskScheduler());
-				}
-				return stateMachineFactory.getStateMachine();
+				return stateMachineFactory;
+			} catch (Exception e) {
+				throw new StateMachineException("Error creating state machine factory", e);
+			}
+		}
+
+		/**
+		 * Builds a {@link StateMachine}.
+		 *
+		 * @return the state machine
+		 */
+		public StateMachine<S, E> build() {
+			try {
+				return createFactory().getStateMachine();
 			} catch (Exception e) {
 				throw new StateMachineException("Error building state machine", e);
 			}
 		}
-
 	}
 
 	private static class BuilderStateMachineConfigurerAdapter<S extends Object, E extends Object>

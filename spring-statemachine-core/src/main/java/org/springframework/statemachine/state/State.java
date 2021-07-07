@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,16 @@
 package org.springframework.statemachine.state;
 
 import java.util.Collection;
+import java.util.function.Function;
 
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateContext;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.action.ActionListener;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * {@code State} is an interface representing possible state in a state machine.
@@ -33,12 +38,13 @@ import org.springframework.statemachine.action.ActionListener;
 public interface State<S, E> {
 
 	/**
-	 * Send an event {@code E} wrapped with a {@link Message} to the state.
+	 * Send an event {@code E} wrapped with a {@link Message} to the state and
+	 * return a {@link StateMachineEventResult} for results.
 	 *
 	 * @param event the wrapped event to send
-	 * @return true if event was accepted
+	 * @return the state machine event results
 	 */
-	boolean sendEvent(Message<E> event);
+	Flux<StateMachineEventResult<S, E>> sendEvent(Message<E> event);
 
 	/**
 	 * Checks if state wants to defer an event.
@@ -52,15 +58,17 @@ public interface State<S, E> {
 	 * Initiate an exit sequence for the state.
 	 *
 	 * @param context the state context
+	 * @return Mono for completion
 	 */
-	void exit(StateContext<S, E> context);
+	Mono<Void> exit(StateContext<S, E> context);
 
 	/**
 	 * Initiate an entry sequence for the state.
 	 *
 	 * @param context the state context
+	 * @return Mono for completion
 	 */
-	void entry(StateContext<S, E> context);
+	Mono<Void> entry(StateContext<S, E> context);
 
 	/**
 	 * Gets the state identifier.
@@ -106,21 +114,21 @@ public interface State<S, E> {
 	 *
 	 * @return the state entry actions
 	 */
-	Collection<? extends Action<S, E>> getEntryActions();
+	Collection<Function<StateContext<S, E>, Mono<Void>>> getEntryActions();
 
 	/**
 	 * Gets {@link Action}s executed once in this state.
 	 *
 	 * @return the state actions
 	 */
-	Collection<? extends Action<S, E>> getStateActions();
+	Collection<Function<StateContext<S, E>, Mono<Void>>> getStateActions();
 
 	/**
 	 * Gets {@link Action}s executed exiting from this state.
 	 *
 	 * @return the state exit actions
 	 */
-	Collection<? extends Action<S, E>> getExitActions();
+	Collection<Function<StateContext<S, E>, Mono<Void>>> getExitActions();
 
 	/**
 	 * Checks if state is a simple state. A simple state does not have any

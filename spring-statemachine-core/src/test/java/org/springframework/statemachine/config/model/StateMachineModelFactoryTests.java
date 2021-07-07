@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2017 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,19 @@
  */
 package org.springframework.statemachine.config.model;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
@@ -35,6 +39,7 @@ import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.TestUtils;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.ObjectStateMachineFactory;
@@ -44,6 +49,8 @@ import org.springframework.statemachine.config.builders.StateMachineConfiguratio
 import org.springframework.statemachine.config.builders.StateMachineModelConfigurer;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
+
+import reactor.core.publisher.Mono;
 
 public class StateMachineModelFactoryTests extends AbstractStateMachineTests {
 
@@ -57,76 +64,72 @@ public class StateMachineModelFactoryTests extends AbstractStateMachineTests {
 		ObjectStateMachineFactory<String, String> factory = new ObjectStateMachineFactory<>(modelBuilder.build());
 
 		StateMachine<String,String> stateMachine = factory.getStateMachine();
-		stateMachine.start();
-		assertThat(stateMachine.getState().getIds(), contains("S1"));
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), contains("S2"));
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsExactly("S1");
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsExactly("S2");
 	}
 
 	@Test
 	public void testFromAnnotationConfig() {
 		context.register(Config2.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
+		StateMachine<String, String> stateMachine = resolveMachine(context);
 
-		stateMachine.start();
-		assertThat(stateMachine.getState().getIds(), contains("S1"));
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), contains("S2"));
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsExactly("S1");
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsExactly("S2");
 	}
 
 	@Test
 	public void testModelRecreates() {
 		context.register(Config3.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachineFactory<String, String> stateMachineFactory = context.getBean(StateMachineFactory.class);
+		StateMachineFactory<String, String> stateMachineFactory = resolveFactory(context);
 		StateMachine<String,String> stateMachine = stateMachineFactory.getStateMachine();
 		TestStateMachineModelFactory modelFactory = context.getBean(TestStateMachineModelFactory.class);
 
-		stateMachine.start();
-		assertThat(stateMachine.getState().getIds(), contains("S1"));
-		stateMachine.sendEvent("E1");
-		assertThat(stateMachine.getState().getIds(), contains("S2"));
-		stateMachine.stop();
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsExactly("S1");
+		doSendEventAndConsumeAll(stateMachine, "E1");
+		assertThat(stateMachine.getState().getIds()).containsExactly("S2");
+		doStopAndAssert(stateMachine);
 
 		modelFactory.state1 = "SS1";
 		modelFactory.state2 = "SS2";
 		modelFactory.event1 = "EE1";
 
 		stateMachine = stateMachineFactory.getStateMachine();
-		stateMachine.start();
-		assertThat(stateMachine.getState().getIds(), contains("SS1"));
-		stateMachine.sendEvent("EE1");
-		assertThat(stateMachine.getState().getIds(), contains("SS2"));
-		stateMachine.stop();
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsExactly("SS1");
+		doSendEventAndConsumeAll(stateMachine, "EE1");
+		assertThat(stateMachine.getState().getIds()).containsExactly("SS2");
+		doStopAndAssert(stateMachine);
 	}
 
 	@Test
 	public void testConfigAdapterConfigFromModel() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
+		StateMachine<String, String> stateMachine = resolveMachine(context);
 
 		Object o1 = TestUtils.readField("stateListener", stateMachine);
 		Object o2 = TestUtils.readField("listeners", o1);
 		Object o3 = TestUtils.readField("list", o2);
-		assertThat(((List<?>)o3).size(), is(0));
+		assertThat(((List<?>)o3)).isEmpty();
 	}
 
 	@Test
 	public void testConfigAdapterConfigFromAdapter() throws Exception {
 		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
+		StateMachine<String, String> stateMachine = resolveMachine(context);
 
 		Object o1 = TestUtils.readField("stateListener", stateMachine);
 		Object o2 = TestUtils.readField("listeners", o1);
 		Object o3 = TestUtils.readField("list", o2);
-		assertThat(((List<?>)o3).size(), is(1));
+		assertThat(((List<?>)o3)).hasSize(1);
 	}
 
 	@Configuration
@@ -280,8 +283,8 @@ public class StateMachineModelFactoryTests extends AbstractStateMachineTests {
 		public StateMachineModel<String, String> build() {
 
 			Action<String, String> action1 = beanFactory.getBean("action1", Action.class);
-			Collection<Action<String, String>> s2Actions = new ArrayList<>();
-			s2Actions.add(action1);
+			Collection<Function<StateContext<String, String>, Mono<Void>>> s2Actions = new ArrayList<>();
+			s2Actions.add(Actions.from(action1));
 
 			ConfigurationData<String, String> configurationData = new ConfigurationData<>();
 
@@ -320,8 +323,8 @@ public class StateMachineModelFactoryTests extends AbstractStateMachineTests {
 		public StateMachineModel<String, String> build() {
 
 			Action<String, String> action1 = beanFactory.getBean("action1", Action.class);
-			Collection<Action<String, String>> s2Actions = new ArrayList<>();
-			s2Actions.add(action1);
+			Collection<Function<StateContext<String, String>, Mono<Void>>> s2Actions = new ArrayList<>();
+			s2Actions.add(Actions.from(action1));
 
 			Collection<StateData<String, String>> stateData = new ArrayList<>();
 			stateData.add(new StateData<String, String>(state1, true));

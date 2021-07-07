@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2018 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,19 @@
  */
 package org.springframework.statemachine.transition;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
@@ -54,163 +49,125 @@ public class TransitionOrderTests extends AbstractStateMachineTests {
 		return new AnnotationConfigApplicationContext();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent1() {
 		TestListener listener = new TestListener();
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
-		assertThat(listener.statesEntered, contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent2() {
 		TestListener listener = new TestListener();
 		context.register(Config2.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseChild1() {
 		TestListener listener = new TestListener();
 		context.register(Config3.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent3() {
 		TestListener listener = new TestListener();
 		context.register(Config4.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent4() {
 		TestListener listener = new TestListener();
 		context.register(Config5.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent5() {
 		TestListener listener = new TestListener();
 		context.register(Config6.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered, contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent6() {
 		TestListener listener = new TestListener();
 		context.register(Config7.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered,
-				contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012, TestStates.S2011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1012, TestStates.S2011, TestStates.S1);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testAnonymousTransitionInConfigUseParent7() {
 		TestListener listener = new TestListener();
 		context.register(Config8.class);
 		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEntered,
-				contains(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1));
-	}
-
-	@SuppressWarnings("unchecked")
-	@Test
-	public void testAnonymousTransitionInConfigUseParent3Threading() throws InterruptedException {
-		TestListener listener = new TestListener();
-		context.register(Config4.class, StateMachineExecutorConfiguration.class);
-		context.refresh();
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		machine.addStateListener(listener);
-
-		machine.start();
-		assertThat(listener.statesEnteredLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
-
-		listener.reset(1, 3);
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.statesEnteredLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener.statesEntered, contains(TestStates.S10, TestStates.S1011, TestStates.S1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.statesEntered).containsExactly(TestStates.S1, TestStates.S10, TestStates.S1011, TestStates.S1);
 	}
 
 	@Configuration
@@ -573,18 +530,6 @@ public class TransitionOrderTests extends AbstractStateMachineTests {
 					.target(TestStates.S2011);
 		}
 	}
-
-	@Configuration
-	public static class StateMachineExecutorConfiguration {
-
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor stateMachineTaskExecutor() {
-			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-			executor.setCorePoolSize(4);
-			return executor;
-		}
-	}
-
 
 	static class TestListener extends StateMachineListenerAdapter<TestStates, TestEvents> {
 

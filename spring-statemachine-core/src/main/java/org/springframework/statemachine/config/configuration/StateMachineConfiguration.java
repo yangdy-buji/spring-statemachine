@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,14 +38,11 @@ import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.ObjectStateMachineFactory;
 import org.springframework.statemachine.config.StateMachineConfig;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineConfigBuilder;
 import org.springframework.statemachine.config.builders.StateMachineConfigurer;
 import org.springframework.statemachine.config.common.annotation.AbstractImportingAnnotationConfiguration;
 import org.springframework.statemachine.config.common.annotation.AnnotationConfigurer;
-import org.springframework.statemachine.config.model.ConfigurationData;
-import org.springframework.statemachine.config.model.DefaultStateMachineModel;
-import org.springframework.statemachine.config.model.StatesData;
-import org.springframework.statemachine.config.model.TransitionsData;
 import org.springframework.statemachine.monitor.StateMachineMonitor;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
@@ -132,7 +129,7 @@ public class StateMachineConfiguration<S, E> extends
 
 	private static class StateMachineDelegatingFactoryBean<S, E>
 		extends BeanDelegatingFactoryBean<StateMachine<S, E>,StateMachineConfigBuilder<S, E>,StateMachineConfig<S, E>>
-		implements SmartLifecycle, BeanNameAware {
+		implements SmartLifecycle, BeanNameAware, BeanClassLoaderAware {
 
 		private String clazzName;
 		private Boolean contextEvents;
@@ -140,6 +137,7 @@ public class StateMachineConfiguration<S, E> extends
 		private DisposableBean disposableBean;
 		private String beanName;
 		private StateMachineMonitor<S, E> stateMachineMonitor;
+		private ClassLoader classLoader;
 
 		public StateMachineDelegatingFactoryBean(StateMachineConfigBuilder<S, E> builder, Class<StateMachine<S, E>> clazz,
 				String clazzName, Boolean contextEvents) {
@@ -154,38 +152,25 @@ public class StateMachineConfiguration<S, E> extends
 		}
 
 		@Override
-		public void afterPropertiesSet() throws Exception {
-			// do not continue without configurers, it would not work
-			if (getConfigurers() == null || getConfigurers().size() == 0) {
-				throw new BeanDefinitionStoreException(
-						"Cannot configure state machine due to missing configurers. Did you remember to use " +
-						"@EnableStateMachine with a StateMachineConfigurerAdapter.");
-			}
-			for (AnnotationConfigurer<StateMachineConfig<S, E>, StateMachineConfigBuilder<S, E>> configurer : getConfigurers()) {
-				Class<?> clazz = configurer.getClass();
-				if (ClassUtils.getUserClass(clazz).getName().equals(clazzName)) {
-					getBuilder().apply(configurer);
-				}
-			}
-			StateMachineConfig<S, E> stateMachineConfig = getBuilder().getOrBuild();
-			TransitionsData<S, E> stateMachineTransitions = stateMachineConfig.getTransitions();
-			StatesData<S, E> stateMachineStates = stateMachineConfig.getStates();
-			ConfigurationData<S, E> stateMachineConfigurationConfig = stateMachineConfig.getStateMachineConfigurationConfig();
+		public void setBeanClassLoader(ClassLoader classLoader) {
+			this.classLoader = classLoader;
+		}
 
-			ObjectStateMachineFactory<S, E> stateMachineFactory = null;
-			if (stateMachineConfig.getModel() != null && stateMachineConfig.getModel().getFactory() != null) {
-				stateMachineFactory = new ObjectStateMachineFactory<S, E>(
-						new DefaultStateMachineModel<S, E>(stateMachineConfigurationConfig, null, null),
-						stateMachineConfig.getModel().getFactory());
-			} else {
-				stateMachineFactory = new ObjectStateMachineFactory<S, E>(new DefaultStateMachineModel<S, E>(
-						stateMachineConfigurationConfig, stateMachineStates, stateMachineTransitions), null);
-			}
+		@SuppressWarnings("unchecked")
+		@Override
+		public void afterPropertiesSet() throws Exception {
+			AnnotationConfigurer<StateMachineConfig<S, E>, StateMachineConfigBuilder<S, E>> configurer =
+					(AnnotationConfigurer<StateMachineConfig<S, E>, StateMachineConfigBuilder<S, E>>) getBeanFactory()
+						.getBean(ClassUtils.forName(clazzName, classLoader));
+			StateMachineConfigBuilder<S, E> builder = getBuilder();
+			builder.apply(configurer);
+
+			ObjectStateMachineFactory<S, E> stateMachineFactory = StateMachineFactory.create(builder);
 
 			stateMachineFactory.setBeanFactory(getBeanFactory());
 			stateMachineFactory.setContextEventsEnabled(contextEvents);
 			stateMachineFactory.setBeanName(beanName);
-			stateMachineFactory.setHandleAutostartup(stateMachineConfigurationConfig.isAutoStart());
+			stateMachineFactory.setHandleAutostartup(builder.getOrBuild().stateMachineConfigurationConfig.isAutoStart());
 			if (stateMachineMonitor != null) {
 				stateMachineFactory.setStateMachineMonitor(stateMachineMonitor);
 			}

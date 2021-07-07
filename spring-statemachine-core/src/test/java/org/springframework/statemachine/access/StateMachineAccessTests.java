@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,28 @@
  */
 package org.springframework.statemachine.access;
 
-import static org.hamcrest.Matchers.sameInstance;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.monitor.StateMachineMonitor;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.StateMachineInterceptor;
 import org.springframework.statemachine.transition.Transition;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class StateMachineAccessTests {
 
@@ -40,26 +44,18 @@ public class StateMachineAccessTests {
 	public void testDoWithAllRegionsSetRelay() {
 		MockStateMachine mock = new MockStateMachine();
 		final StateMachine<String, String> stateMachine = mock;
-		stateMachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<String, String>>() {
+		stateMachine.getStateMachineAccessor().doWithAllRegions(function -> function.setRelay(stateMachine));
 
-			@Override
-			public void apply(StateMachineAccess<String, String> function) {
-				function.setRelay(stateMachine);
-			}
-
-		});
-
-		assertThat(mock.relay, sameInstance(stateMachine));
+		assertThat(mock.relay).isSameAs(stateMachine);
 	}
 
 	@Test
 	public void testGetAllRegionsSetRelay() {
 		MockStateMachine mock = new MockStateMachine();
 		final StateMachine<String, String> stateMachine = mock;
-		stateMachine.getStateMachineAccessor().withAllRegions().stream()
-				.forEach(access -> access.setRelay(stateMachine));
+		stateMachine.getStateMachineAccessor().withAllRegions().forEach(access -> access.setRelay(stateMachine));
 
-		assertThat(mock.relay, sameInstance(stateMachine));
+		assertThat(mock.relay).isSameAs(stateMachine);
 	}
 
 	private static class MockStateMachine implements StateMachine<String, String>, StateMachineAccess<String, String> {
@@ -71,8 +67,8 @@ public class StateMachineAccessTests {
 			return new StateMachineAccessor<String, String>() {
 
 				@Override
-				public void doWithAllRegions(StateMachineFunction<StateMachineAccess<String, String>> stateMachineAccess) {
-					stateMachineAccess.apply(MockStateMachine.this);
+				public void doWithAllRegions(Consumer<StateMachineAccess<String, String>> stateMachineAccess) {
+					stateMachineAccess.accept(MockStateMachine.this);
 				}
 
 				@Override
@@ -83,7 +79,7 @@ public class StateMachineAccessTests {
 				}
 
 				@Override
-				public void doWithRegion(StateMachineFunction<StateMachineAccess<String, String>> stateMachineAccess) {
+				public void doWithRegion(Consumer<StateMachineAccess<String, String>> stateMachineAccess) {
 				}
 
 				@Override
@@ -115,21 +111,55 @@ public class StateMachineAccessTests {
 		}
 
 		@Override
+		public Mono<Void> resetStateMachineReactively(StateMachineContext<String, String> stateMachineContext) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> startReactively() {
+			return null;
+		}
+
+		@Override
+		public Mono<Void> stopReactively() {
+			return null;
+		}
+
+		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void start() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void stop() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(Message<String> event) {
 			return false;
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(String event) {
 			return false;
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<String, String>> sendEvent(Mono<Message<String>> event) {
+			return null;
+		}
+
+		@Override
+		public Mono<List<StateMachineEventResult<String, String>>> sendEventCollect(Mono<Message<String>> event) {
+			return null;
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<String, String>> sendEvents(Flux<Message<String>> events) {
+			return null;
 		}
 
 		@Override

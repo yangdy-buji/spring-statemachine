@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,19 +23,21 @@ import java.util.Map;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.shell.Bootstrap;
 import org.springframework.statemachine.StateContext;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.annotation.OnTransition;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.guard.Guard;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.util.ObjectUtils;
+
+import reactor.core.publisher.Mono;
 
 @Configuration
 public class Application  {
@@ -44,6 +46,16 @@ public class Application  {
 	@EnableStateMachine
 	static class StateMachineConfig
 			extends EnumStateMachineConfigurerAdapter<States, Events> {
+
+//tag::snippetAE[]
+		@Override
+		public void configure(StateMachineConfigurationConfigurer<States, Events> config)
+				throws Exception {
+			config
+				.withConfiguration()
+					.regionExecutionPolicy(RegionExecutionPolicy.PARALLEL);
+		}
+//end::snippetAE[]
 
 //tag::snippetAA[]
 		@Override
@@ -155,9 +167,15 @@ public class Application  {
 					if (ObjectUtils.nullSafeEquals(variables.get("T1"), true)
 							&& ObjectUtils.nullSafeEquals(variables.get("T2"), true)
 							&& ObjectUtils.nullSafeEquals(variables.get("T3"), true)) {
-						context.getStateMachine().sendEvent(Events.CONTINUE);
+						context.getStateMachine()
+							.sendEvent(Mono.just(MessageBuilder
+								.withPayload(Events.CONTINUE).build()))
+							.subscribe();
 					} else {
-						context.getStateMachine().sendEvent(Events.FALLBACK);
+						context.getStateMachine()
+							.sendEvent(Mono.just(MessageBuilder
+								.withPayload(Events.FALLBACK).build()))
+							.subscribe();
 					}
 				}
 			};
@@ -173,7 +191,10 @@ public class Application  {
 					variables.put("T1", true);
 					variables.put("T2", true);
 					variables.put("T3", true);
-					context.getStateMachine().sendEvent(Events.CONTINUE);
+					context.getStateMachine()
+						.sendEvent(Mono.just(MessageBuilder
+							.withPayload(Events.CONTINUE).build()))
+						.subscribe();
 				}
 			};
 		}
@@ -183,16 +204,6 @@ public class Application  {
 		public Tasks tasks() {
 			return new Tasks();
 		}
-
-//tag::snippetAE[]
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-			taskExecutor.setCorePoolSize(5);
-			return taskExecutor;
-		}
-//end::snippetAE[]
-
 	}
 
 //tag::snippetB[]

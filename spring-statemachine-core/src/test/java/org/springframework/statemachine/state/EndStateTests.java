@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,14 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
 import org.springframework.statemachine.StateMachineSystemConstants;
@@ -51,76 +43,76 @@ public class EndStateTests extends AbstractStateMachineTests {
 	public void testEndStateCompletes() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine).isNotNull();
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E2);
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E3);
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E4);
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.EF);
-		assertThat(machine.isComplete(), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates.SF));
+		assertThat(machine.isComplete()).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SF);
 	}
 
 	@Test
 	public void testEndStatesWithRegions() throws InterruptedException {
 		context.register(Config2.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates3,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates3.READY));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates3.READY);
 	}
 
 	@Test
 	public void testEndStatesWithRegionsDefinedInStates() throws InterruptedException {
 		context.register(Config3.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates3,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates3.READY));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates3.READY);
 	}
 
 	@Test
 	public void testEndStateCompletesSubmachine() {
 		context.register(Config4.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
-		assertThat(machine.isComplete(), is(false));
-		assertThat(machine.getState().getIds(), contains(TestStates.SI));
+		assertThat(machine).isNotNull();
+		assertThat(machine.isComplete()).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
 
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.isComplete(), is(false));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1, TestStates.S11));
+		assertThat(machine.isComplete()).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1, TestStates.S11);
 
 		machine.sendEvent(TestEvents.E2);
-		assertThat(machine.isComplete(), is(false));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1, TestStates.S12));
+		assertThat(machine.isComplete()).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1, TestStates.S12);
 
 		machine.sendEvent(TestEvents.E3);
-		assertThat(machine.isComplete(), is(false));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1, TestStates.SF));
+		assertThat(machine.isComplete()).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1, TestStates.SF);
 	}
 
 	@Test
@@ -139,73 +131,74 @@ public class EndStateTests extends AbstractStateMachineTests {
 	public void testEndStateCompletesMultipleEndStates1() {
 		context.register(Config7.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine).isNotNull();
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.isComplete(), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
+		assertThat(machine.isComplete()).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
 	}
 
 	@Test
 	public void testEndStateCompletesMultipleEndStates2() {
 		context.register(Config7.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
-		assertThat(machine.isComplete(), is(false));
+		assertThat(machine).isNotNull();
+		assertThat(machine.isComplete()).isFalse();
 		machine.sendEvent(TestEvents.E2);
-		assertThat(machine.isComplete(), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates.S2));
+		assertThat(machine.isComplete()).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2);
 	}
 
 	@Test
 	public void testEndStatesWithRegionsCompletionCompletes() throws InterruptedException {
-		context.register(Config8.class, BaseConfig2.class);
+		context.register(Config8.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates4,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		TestStateMachineListener4 listener = new TestStateMachineListener4();
 		machine.addStateListener(listener);
 		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates4.DONE));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates4.DONE);
 	}
 
 	@Test
 	public void testEndStatesWithSubmachineCompletionCompletes() throws InterruptedException {
-		context.register(Config9.class, BaseConfig2.class);
+		context.register(Config9.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates4,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		TestStateMachineListener4 listener = new TestStateMachineListener4();
+		listener.reset(5, 1);
 		machine.addStateListener(listener);
 		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates4.DONE));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates4.DONE);
 	}
 
 	@Test
 	public void testEndStatesWithRegionsCompletionCompletes2() throws InterruptedException {
-		context.register(Config10.class, BaseConfig2.class);
+		context.register(Config10.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates4,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -214,24 +207,24 @@ public class EndStateTests extends AbstractStateMachineTests {
 		listener.reset(1, 1);
 
 		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates4.READY));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates4.READY);
 
 		listener.reset(3, 0);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates4.TASKS, TestStates4.T1, TestStates4.T2));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly(TestStates4.TASKS, TestStates4.T1, TestStates4.T2);
 
 		listener.reset(1, 0);
 		machine.sendEvent(TestEvents.E2);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates4.TASKS, TestStates4.T1E, TestStates4.T2));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly(TestStates4.TASKS, TestStates4.T1E, TestStates4.T2);
 
 		listener.reset(2, 0);
 		machine.sendEvent(TestEvents.E3);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates4.DONE));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates4.DONE);
 	}
 
 	@Configuration
@@ -275,12 +268,6 @@ public class EndStateTests extends AbstractStateMachineTests {
 					.target(TestStates.SF)
 					.event(TestEvents.EF);
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration
@@ -454,11 +441,6 @@ public class EndStateTests extends AbstractStateMachineTests {
 					.source(TestStates.S12)
 					.target(TestStates.SF)
 					.event(TestEvents.E3);
-		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
 		}
 	}
 

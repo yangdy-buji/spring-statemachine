@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,15 @@
  */
 package org.springframework.statemachine.security;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,14 +50,15 @@ import org.springframework.statemachine.state.State;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
  * Tests for securing actions.
  *
  * @author Janne Valkealahti
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@Disabled("TODO: REACTOR rethink security things")
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {Config1.class, Config2.class})
 @DirtiesContext(classMode = ClassMode.BEFORE_EACH_TEST_METHOD)
 public class ActionSecurityTests extends AbstractStateMachineTests {
@@ -74,31 +75,31 @@ public class ActionSecurityTests extends AbstractStateMachineTests {
 	@Test
 	@WithMockUser(roles = { "FOO" })
 	public void testActionExecutionDenied() throws Exception {
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1));
-		assertThat(action1.getCount(), is(0));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1);
+		assertThat(action1.getCount()).isZero();
 	}
 
 	@Test
 	@WithMockUser
 	public void testActionExecutionAllowed() throws Exception {
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1));
-		assertThat(action1.getCount(), is(1));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1);
+		assertThat(action1.getCount()).isEqualTo(1);
 	}
 
 	@Configuration

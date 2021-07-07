@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,10 @@
  */
 package org.springframework.statemachine.trigger;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -27,7 +26,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,8 +52,18 @@ public class TimerTriggerTests extends AbstractStateMachineTests {
 	}
 
 	@Test
+	public void testGetter() {
+		final long period = 1000;
+		final int count = 1;
+		@SuppressWarnings("rawtypes")
+		final TimerTrigger timerTrigger = new TimerTrigger(period, count);
+		assertThat(period).isEqualTo(timerTrigger.getPeriod());
+		assertThat(count).isEqualTo(timerTrigger.getCount());
+	}
+
+	@Test
 	public void testListenerEvents() throws Exception {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
 
 		final CountDownLatch latch = new CountDownLatch(2);
@@ -70,57 +79,55 @@ public class TimerTriggerTests extends AbstractStateMachineTests {
 		timerTrigger.afterPropertiesSet();
 		timerTrigger.start();
 
-		assertThat(latch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testTimerTransitions() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		TestTimerAction action = context.getBean("testTimerAction", TestTimerAction.class);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S1);
 
 		listener.reset(1);
-		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2100, TimeUnit.MILLISECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.stateChangedLatch.await(2100, TimeUnit.MILLISECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2);
 
 		Thread.sleep(1000);
 		// we should have 100, just test 80 due to timing
-		assertThat(action.count, greaterThan(80));
+		assertThat(action.count).isGreaterThan(80);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testTimerExternalTransitions() throws Exception {
 		context.register(Config3.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestTimerAction2 action = context.getBean("testTimerAction2", TestTimerAction2.class);
 		TestListener2 listener = new TestListener2();
 		machine.addStateListener(listener);
 
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder("READY"));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly("READY");
 
 		for (int i = 0; i < 4; i++) {
 			listener.reset(2);
 			action.reset();
-			machine.sendEvent("SWITCH_TO_RUNNING");
-			assertThat(action.latch.await(5, TimeUnit.SECONDS), is(true));
-			assertThat(action.count, is(1));
-			assertThat(listener.stateChangedLatch.await(5, TimeUnit.SECONDS), is(true));
-			assertThat(listener.stateChangedCount, is(2));
-			assertThat(machine.getState().getIds(), containsInAnyOrder("RUNNING_TESTING"));
+			doSendEventAndConsumeAll(machine, "SWITCH_TO_RUNNING");
+			assertThat(action.latch.await(5, TimeUnit.SECONDS)).isTrue();
+			assertThat(action.count).isEqualTo(1);
+			assertThat(listener.stateChangedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+			assertThat(listener.stateChangedCount).isEqualTo(2);
+			assertThat(machine.getState().getIds()).containsOnly("RUNNING_TESTING");
 		}
 	}
 
@@ -136,12 +143,11 @@ public class TimerTriggerTests extends AbstractStateMachineTests {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testTimerDelayFireOnlyOnState() throws Exception {
-		context.register(BaseConfig.class, Config4.class);
+		context.register(Config4.class);
 		context.refresh();
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		TestTimerAction action = context.getBean("testTimerAction", TestTimerAction.class);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
@@ -154,30 +160,30 @@ public class TimerTriggerTests extends AbstractStateMachineTests {
 				continue;
 			}
 		}
-		assertThat(trigger, notNullValue());
+		assertThat(trigger).isNotNull();
 		TestTriggerListener tlistener = new TestTriggerListener();
 		trigger.addTriggerListener(tlistener);
 
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S1);
 
-		assertThat(tlistener.latch.await(2, TimeUnit.SECONDS), is(false));
+		assertThat(tlistener.latch.await(2, TimeUnit.SECONDS)).isFalse();
 
 		listener.reset(1);
-		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2);
 
-		assertThat(tlistener.latch.await(1, TimeUnit.SECONDS), is(false));
-		assertThat(tlistener.count.get(), is(0));
-		assertThat(tlistener.latch.await(4, TimeUnit.SECONDS), is(true));
-		assertThat(tlistener.count.get(), is(1));
+		assertThat(tlistener.latch.await(1, TimeUnit.SECONDS)).isFalse();
+		assertThat(tlistener.count.get()).isZero();
+		assertThat(tlistener.latch.await(4, TimeUnit.SECONDS)).isTrue();
+		assertThat(tlistener.count.get()).isEqualTo(1);
 
-		assertThat(action.latch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(action.latch.await(2, TimeUnit.SECONDS)).isTrue();
 		action.reset(1);
-		assertThat(action.latch.await(2, TimeUnit.SECONDS), is(false));
+		assertThat(action.latch.await(2, TimeUnit.SECONDS)).isFalse();
 	}
 
 	static class Config1 {

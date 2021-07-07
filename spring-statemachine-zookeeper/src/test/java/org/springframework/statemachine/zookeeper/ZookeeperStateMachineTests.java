@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,19 @@
  */
 package org.springframework.statemachine.zookeeper;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.curator.framework.CuratorFramework;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateContext;
@@ -101,22 +98,22 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 		listener1.reset(1);
 		listener2.reset(1);
 		machine1s.sendEvent("E1");
-		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.stateChangedCount, is(1));
-		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.stateChangedCount, is(1));
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S1"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.stateChangedCount).isEqualTo(1);
+		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.stateChangedCount).isEqualTo(1);
+		assertThat(machine1.getState().getIds()).containsOnly("S1");
+		assertThat(machine2.getState().getIds()).containsOnly("S1");
 
 		listener1.reset(1);
 		listener2.reset(1);
 		machine1s.sendEvent("E2");
-		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.stateChangedCount, is(1));
-		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.stateChangedCount, is(1));
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S2"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S2"));
+		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.stateChangedCount).isEqualTo(1);
+		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.stateChangedCount).isEqualTo(1);
+		assertThat(machine1.getState().getIds()).containsOnly("S2");
+		assertThat(machine2.getState().getIds()).containsOnly("S2");
 	}
 
 	@Test
@@ -162,22 +159,22 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 		listener1.reset(1);
 		listener2.reset(1);
 		machine1s.sendEvent("E1");
-		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.stateChangedCount, is(1));
-		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.stateChangedCount, is(1));
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S1"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.stateChangedCount).isEqualTo(1);
+		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.stateChangedCount).isEqualTo(1);
+		assertThat(machine1.getState().getIds()).containsOnly("S1");
+		assertThat(machine2.getState().getIds()).containsOnly("S1");
 
 		listener1.reset(1);
 		listener2.reset(1);
 		machine2s.sendEvent("E2");
-		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.stateChangedCount, is(1));
-		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.stateChangedCount, is(1));
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S2"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S2"));
+		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.stateChangedCount).isEqualTo(1);
+		assertThat(listener2.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.stateChangedCount).isEqualTo(1);
+		assertThat(machine1.getState().getIds()).containsOnly("S2");
+		assertThat(machine2.getState().getIds()).containsOnly("S2");
 	}
 
 	@Test
@@ -191,10 +188,10 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 		StateMachine<String, String> machine2 =
 				context.getBean("sm2", StateMachine.class);
 
-		assertThat(((SmartLifecycle)machine1).isAutoStartup(), is(false));
-		assertThat(((SmartLifecycle)machine1).isRunning(), is(false));
-		assertThat(((SmartLifecycle)machine2).isAutoStartup(), is(false));
-		assertThat(((SmartLifecycle)machine2).isRunning(), is(false));
+		assertThat(((SmartLifecycle)machine1).isAutoStartup()).isFalse();
+		assertThat(((SmartLifecycle)machine1).isRunning()).isFalse();
+		assertThat(((SmartLifecycle)machine2).isAutoStartup()).isFalse();
+		assertThat(((SmartLifecycle)machine2).isRunning()).isFalse();
 	}
 
 	@Test
@@ -485,9 +482,9 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 
 		listener1.reset(1);
 		machine1s.sendEvent("E1");
-		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.stateChangedCount, is(1));
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener1.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.stateChangedCount).isEqualTo(1);
+		assertThat(machine1.getState().getIds()).containsOnly("S1");
 
 		ZookeeperStateMachineEnsemble<String, String> ensemble2 =
 				new ZookeeperStateMachineEnsemble<String, String>(curatorClient, "/foo");
@@ -498,7 +495,7 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 				new DistributedStateMachine<String, String>(ensemble2, machine2);
 		machine2s.afterPropertiesSet();
 		machine2s.start();
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(machine2.getState().getIds()).containsOnly("S1");
 	}
 
 	@Test
@@ -791,7 +788,6 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 
 		builder.configureConfiguration()
 			.withConfiguration()
-				.taskExecutor(new SyncTaskExecutor())
 				.autoStartup(true)
 				.and()
 			.withDistributed()
@@ -897,7 +893,6 @@ public class ZookeeperStateMachineTests extends AbstractZookeeperTests {
 
 		builder.configureConfiguration()
 			.withConfiguration()
-				.taskExecutor(new SyncTaskExecutor())
 				.autoStartup(true)
 				.and()
 			.withDistributed()

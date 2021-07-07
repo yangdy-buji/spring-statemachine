@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,11 @@
  */
 package org.springframework.statemachine.config.configurers;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.function.Function;
+
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.config.builders.StateMachineTransitionBuilder;
@@ -22,11 +27,11 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 import org.springframework.statemachine.config.common.annotation.AnnotationConfigurerAdapter;
 import org.springframework.statemachine.config.model.TransitionsData;
 import org.springframework.statemachine.guard.Guard;
+import org.springframework.statemachine.guard.Guards;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.security.SecurityRule.ComparisonType;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import reactor.core.publisher.Mono;
 
 /**
  * Base class for transition configurers.
@@ -45,8 +50,8 @@ public abstract class AbstractTransitionConfigurer<S, E> extends
 	private E event;
 	private Long period;
 	private Integer count;
-	private final Collection<Action<S, E>> actions = new ArrayList<>();
-	private Guard<S, E> guard;
+	private final Collection<Function<StateContext<S, E>, Mono<Void>>> actions = new ArrayList<>();
+	private Function<StateContext<S, E>, Mono<Boolean>> guard;
 	private SecurityRule securityRule;
 
 	protected S getSource() {
@@ -77,11 +82,11 @@ public abstract class AbstractTransitionConfigurer<S, E> extends
 		return count;
 	}
 
-	protected Collection<Action<S, E>> getActions() {
+	protected Collection<Function<StateContext<S, E>, Mono<Void>>> getActions() {
 		return actions;
 	}
 
-	protected Guard<S, E> getGuard() {
+	protected Function<StateContext<S, E>, Mono<Boolean>> getGuard() {
 		return guard;
 	}
 
@@ -122,10 +127,18 @@ public abstract class AbstractTransitionConfigurer<S, E> extends
 	}
 
 	protected void addAction(Action<S, E> action, Action<S, E> error) {
-		this.actions.add(error != null ? Actions.errorCallingAction(action, error) : action);
+		this.actions.add(Actions.from(error != null ? Actions.errorCallingAction(action, error) : action));
+	}
+
+	protected void addActionFunction(Function<StateContext<S, E>, Mono<Void>> action) {
+		this.actions.add(action);
 	}
 
 	protected void setGuard(Guard<S, E> guard) {
+		this.guard = Guards.from(guard);
+	}
+
+	protected void setGuardFunction(Function<StateContext<S, E>, Mono<Boolean>> guard) {
 		this.guard = guard;
 	}
 

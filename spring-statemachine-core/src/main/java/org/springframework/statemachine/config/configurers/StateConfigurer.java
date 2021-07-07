@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,17 @@ package org.springframework.statemachine.config.configurers;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Function;
 
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.common.annotation.AnnotationConfigurerBuilder;
 import org.springframework.statemachine.state.State;
+
+import reactor.core.publisher.Mono;
 
 /**
  * Base {@code StateConfigurer} interface for configuring {@link State}s.
@@ -62,6 +66,14 @@ public interface StateConfigurer<S, E> extends
 	 * @return configurer for chaining
 	 */
 	StateConfigurer<S, E> parent(S state);
+
+	/**
+	 * Specify a region for these states configured by this configurer instance.
+	 *
+	 * @param id the region id
+	 * @return configurer for chaining
+	 */
+	StateConfigurer<S, E> region(String id);
 
 	/**
 	 * Specify a state {@code S}.
@@ -130,6 +142,33 @@ public interface StateConfigurer<S, E> extends
 	 * @return configurer for chaining
 	 */
 	StateConfigurer<S, E> stateDo(S state, Action<S, E> action, Action<S, E> error);
+
+	/**
+	 * Specify a state {@code S} with state behaviour {@link Function}.
+	 *
+	 * @param state the state
+	 * @param action the state action
+	 * @return configurer for chaining
+	 */
+	StateConfigurer<S, E> stateDoFunction(S state, Function<StateContext<S, E>, Mono<Void>> action);
+
+	/**
+	 * Specify a state {@code S} with state entry {@link Function}.
+	 *
+	 * @param state the state
+	 * @param action the state action
+	 * @return configurer for chaining
+	 */
+	StateConfigurer<S, E> stateEntryFunction(S state, Function<StateContext<S, E>, Mono<Void>> action);
+
+	/**
+	 * Specify a state {@code S} with state exit {@link Function}.
+	 *
+	 * @param state the state
+	 * @param action the state action
+	 * @return configurer for chaining
+	 */
+	StateConfigurer<S, E> stateExitFunction(S state, Function<StateContext<S, E>, Mono<Void>> action);
 
 	/**
 	 * Specify a state {@code S} with entry and exit {@link Action}s.

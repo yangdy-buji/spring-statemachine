@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,18 @@
  */
 package org.springframework.statemachine.transition;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -36,207 +34,182 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
 
-@SuppressWarnings("unchecked")
 public class LocalTransitionTests extends AbstractStateMachineTests {
 
 	@Test
 	public void testExternalSuperDoesEntryExitToSub() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E20");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
-		assertThat(listener.exited.size(), is(2));
-		assertThat(listener.entered.size(), is(2));
-		assertThat(listener.exited, containsInAnyOrder("S2", "S21"));
-		assertThat(listener.entered, containsInAnyOrder("S2", "S21"));
+		doSendEventAndConsumeAll(machine, "E20");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
+		assertThat(listener.exited).hasSize(2);
+		assertThat(listener.entered).hasSize(2);
+		assertThat(listener.exited).containsOnly("S2", "S21");
+		assertThat(listener.entered).containsOnly("S2", "S21");
 	}
 
 	@Test
 	public void testLocalSuperDoesNotEntryExitToSub() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E30");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
-		assertThat(listener.exited, containsInAnyOrder("S21"));
-		assertThat(listener.entered, containsInAnyOrder("S21"));
+		doSendEventAndConsumeAll(machine, "E30");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
+		assertThat(listener.exited).containsOnly("S21");
+		assertThat(listener.entered).containsOnly("S21");
 	}
 
 	@Test
 	public void testExternalToNonInitialSuperDoesEntryExitToSub() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E21");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(2));
-		assertThat(listener.entered.size(), is(2));
-		assertThat(listener.exited, containsInAnyOrder("S2", "S21"));
-		assertThat(listener.entered, containsInAnyOrder("S2", "S22"));
+		doSendEventAndConsumeAll(machine, "E21");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(2);
+		assertThat(listener.entered).hasSize(2);
+		assertThat(listener.exited).containsOnly("S2", "S21");
+		assertThat(listener.entered).containsOnly("S2", "S22");
 	}
 
 	@Test
 	public void testLocalToNonInitialSuperDoesNotEntryExitToSub() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E31");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
-		assertThat(listener.exited, containsInAnyOrder("S21"));
-		assertThat(listener.entered, containsInAnyOrder("S22"));
+		doSendEventAndConsumeAll(machine, "E31");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
+		assertThat(listener.exited).containsOnly("S21");
+		assertThat(listener.entered).containsOnly("S22");
 	}
 
 	@Test
 	public void testExternalSuperDoesEntryExitToParent() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E22");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
-		assertThat(listener.exited.size(), is(2));
-		assertThat(listener.entered.size(), is(2));
-		assertThat(listener.exited, containsInAnyOrder("S2", "S21"));
-		assertThat(listener.entered, containsInAnyOrder("S2", "S21"));
+		doSendEventAndConsumeAll(machine, "E22");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
+		assertThat(listener.exited).hasSize(2);
+		assertThat(listener.entered).hasSize(2);
+		assertThat(listener.exited).containsOnly("S2", "S21");
+		assertThat(listener.entered).containsOnly("S2", "S21");
 	}
 
 	@Test
 	public void testLocalSuperDoesNotEntryExitToParent() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E32");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
-		assertThat(listener.exited, containsInAnyOrder("S21"));
-		assertThat(listener.entered, containsInAnyOrder("S21"));
+		doSendEventAndConsumeAll(machine, "E32");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
+		assertThat(listener.exited).containsOnly("S21");
+		assertThat(listener.entered).containsOnly("S21");
 	}
 
 	@Test
 	public void testExternalToNonInitialSuperDoesEntryExitToParent() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E21");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(2));
-		assertThat(listener.entered.size(), is(2));
-		assertThat(listener.exited, containsInAnyOrder("S2", "S21"));
-		assertThat(listener.entered, containsInAnyOrder("S2", "S22"));
+		doSendEventAndConsumeAll(machine, "E21");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(2);
+		assertThat(listener.entered).hasSize(2);
+		assertThat(listener.exited).containsOnly("S2", "S21");
+		assertThat(listener.entered).containsOnly("S2", "S22");
 
 		listener.reset();
-		machine.sendEvent("E23");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(2));
-		assertThat(listener.entered.size(), is(2));
-		assertThat(listener.exited, containsInAnyOrder("S2", "S22"));
-		assertThat(listener.entered, containsInAnyOrder("S2", "S22"));
+		doSendEventAndConsumeAll(machine, "E23");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(2);
+		assertThat(listener.entered).hasSize(2);
+		assertThat(listener.exited).containsOnly("S2", "S22");
+		assertThat(listener.entered).containsOnly("S2", "S22");
 	}
 
 	@Test
 	public void testLocalToNonInitialSuperDoesNotEntryExitToParent() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21"));
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21");
 
 		listener.reset();
-		machine.sendEvent("E31");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
-		assertThat(listener.exited, containsInAnyOrder("S21"));
-		assertThat(listener.entered, containsInAnyOrder("S22"));
+		doSendEventAndConsumeAll(machine, "E31");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
+		assertThat(listener.exited).containsOnly("S21");
+		assertThat(listener.entered).containsOnly("S22");
 
 		listener.reset();
-		machine.sendEvent("E33");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S22"));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
-		assertThat(listener.exited, containsInAnyOrder("S22"));
-		assertThat(listener.entered, containsInAnyOrder("S22"));
+		doSendEventAndConsumeAll(machine, "E33");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S22");
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
+		assertThat(listener.exited).containsOnly("S22");
+		assertThat(listener.entered).containsOnly("S22");
 	}
 
 	@Configuration

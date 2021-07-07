@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@ public class StateMachineInterceptorList<S, E> {
 	 * Sets the interceptors, clears any existing interceptors.
 	 *
 	 * @param interceptors the list of interceptors
-	 * @return <tt>true</tt> if interceptor list changed as a result of the
+	 * @return {@code true} if interceptor list changed as a result of the
 	 *         call
 	 */
 	public boolean set(List<StateMachineInterceptor<S, E>> interceptors) {
@@ -55,7 +55,7 @@ public class StateMachineInterceptorList<S, E> {
 	 * Adds interceptor to the list.
 	 *
 	 * @param interceptor the interceptor
-	 * @return <tt>true</tt> (as specified by {@link Collection#add})
+	 * @return {@code true} (as specified by {@link Collection#add})
 	 */
 	public boolean add(StateMachineInterceptor<S, E> interceptor) {
 		return interceptors.add(interceptor);
@@ -65,7 +65,7 @@ public class StateMachineInterceptorList<S, E> {
 	 * Removes interceptor from the list.
 	 *
 	 * @param interceptor the interceptor
-	 * @return <tt>true</tt> (as specified by {@link Collection#remove})
+	 * @return {@code true} (as specified by {@link Collection#remove})
 	 */
 	public boolean remove(StateMachineInterceptor<S, E> interceptor) {
 		return interceptors.remove(interceptor);
@@ -94,11 +94,12 @@ public class StateMachineInterceptorList<S, E> {
 	 * @param message the message
 	 * @param transition the transition
 	 * @param stateMachine the state machine
+	 * @param rootStateMachine the root state machine
 	 */
 	public void preStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-			StateMachine<S, E> stateMachine) {
+			StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
 		for (StateMachineInterceptor<S, E> interceptor : interceptors) {
-			interceptor.preStateChange(state, message, transition, stateMachine);
+			interceptor.preStateChange(state, message, transition, stateMachine, rootStateMachine);
 		}
 	}
 
@@ -109,11 +110,12 @@ public class StateMachineInterceptorList<S, E> {
 	 * @param message the message
 	 * @param transition the transition
 	 * @param stateMachine the state machine
+	 * @param rootStateMachine the root state machine
 	 */
 	public void postStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-			StateMachine<S, E> stateMachine) {
+			StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
 		for (StateMachineInterceptor<S, E> interceptor : interceptors) {
-			interceptor.postStateChange(state, message, transition, stateMachine);
+			interceptor.postStateChange(state, message, transition, stateMachine, rootStateMachine);
 		}
 	}
 

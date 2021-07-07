@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -66,13 +66,15 @@ public class Persist {
 
 //tag::snippetB[]
 	public void change(int order, String event) {
-		Order o = jdbcTemplate.queryForObject("select id, state from orders where id = ?", new Object[] { order },
+		Order o = jdbcTemplate.queryForObject("select id, state from orders where id = ?",
 				new RowMapper<Order>() {
 					public Order mapRow(ResultSet rs, int rowNum) throws SQLException {
 						return new Order(rs.getInt("id"), rs.getString("state"));
 					}
-				});
-		handler.handleEventWithState(MessageBuilder.withPayload(event).setHeader("order", order).build(), o.state);
+				}, new Object[] { order });
+		handler.handleEventWithStateReactively(MessageBuilder
+				.withPayload(event).setHeader("order", order).build(), o.state)
+			.subscribe();
 	}
 
 	//end::snippetB[]

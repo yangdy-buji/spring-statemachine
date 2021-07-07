@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,6 @@ public abstract class StateMachineSystemConstants {
 	/** State machine id key for headers and variables */
 	public static final String STATEMACHINE_IDENTIFIER = "_sm_id_";
 
-	/** Bean name for task executor */
-	public static final String TASK_EXECUTOR_BEAN_NAME = "stateMachineTaskExecutor";
-
+	/** Contstant storing errors in a reactor context */
+	public static final String REACTOR_CONTEXT_ERRORS = "stateMachineErrors";
 }

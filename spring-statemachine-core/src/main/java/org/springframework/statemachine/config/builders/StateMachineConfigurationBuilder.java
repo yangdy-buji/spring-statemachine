@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,9 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.TaskScheduler;
 import org.springframework.security.access.AccessDecisionManager;
+import org.springframework.statemachine.action.StateDoActionPolicy;
 import org.springframework.statemachine.config.common.annotation.AbstractConfiguredAnnotationBuilder;
 import org.springframework.statemachine.config.common.annotation.AnnotationBuilder;
 import org.springframework.statemachine.config.common.annotation.ObjectPostProcessor;
@@ -44,6 +43,7 @@ import org.springframework.statemachine.ensemble.StateMachineEnsemble;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.monitor.StateMachineMonitor;
 import org.springframework.statemachine.persist.StateMachineRuntimePersister;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.support.StateMachineInterceptor;
 import org.springframework.statemachine.transition.TransitionConflictPolicy;
@@ -62,10 +62,11 @@ public class StateMachineConfigurationBuilder<S, E>
 
 	private String machineId;
 	private BeanFactory beanFactory;
-	private TaskExecutor taskExecutor;
-	private TaskScheduler taskScheculer;
 	private boolean autoStart = false;
 	private TransitionConflictPolicy transitionConflictPolicy;
+	private StateDoActionPolicy stateDoActionPolicy;
+	private Long stateDoActionPolicyTimeout;
+	private RegionExecutionPolicy regionExecutionPolicy;
 	private StateMachineEnsemble<S, E> ensemble;
 	private final List<StateMachineListener<S, E>> listeners = new ArrayList<StateMachineListener<S, E>>();
 	private boolean securityEnabled = false;
@@ -142,12 +143,13 @@ public class StateMachineConfigurationBuilder<S, E>
 		if (persister != null) {
 			StateMachineInterceptor<S, E> interceptor = persister.getInterceptor();
 			if (interceptor != null) {
-				interceptorsCopy.add((StateMachineInterceptor<S, E>) interceptor);
+				interceptorsCopy.add(interceptor);
 			}
 		}
-		return new ConfigurationData<S, E>(beanFactory, taskExecutor, taskScheculer, autoStart, ensemble, listeners,
-				securityEnabled, transitionSecurityAccessDecisionManager, eventSecurityAccessDecisionManager, eventSecurityRule,
-				transitionSecurityRule, verifierEnabled, verifier, machineId, stateMachineMonitor, interceptorsCopy, transitionConflictPolicy);
+		return new ConfigurationData<S, E>(beanFactory, autoStart, ensemble, listeners, securityEnabled,
+				transitionSecurityAccessDecisionManager, eventSecurityAccessDecisionManager, eventSecurityRule,
+				transitionSecurityRule, verifierEnabled, verifier, machineId, stateMachineMonitor, interceptorsCopy,
+				transitionConflictPolicy, stateDoActionPolicy, stateDoActionPolicyTimeout, regionExecutionPolicy);
 	}
 
 	/**
@@ -166,24 +168,6 @@ public class StateMachineConfigurationBuilder<S, E>
 	 */
 	public void setBeanFactory(BeanFactory beanFactory) {
 		this.beanFactory = beanFactory;
-	}
-
-	/**
-	 * Sets the task executor.
-	 *
-	 * @param taskExecutor the new task executor
-	 */
-	public void setTaskExecutor(TaskExecutor taskExecutor) {
-		this.taskExecutor = taskExecutor;
-	}
-
-	/**
-	 * Sets the task scheculer.
-	 *
-	 * @param taskScheculer the new task scheculer
-	 */
-	public void setTaskScheculer(TaskScheduler taskScheculer) {
-		this.taskScheculer = taskScheculer;
 	}
 
 	/**
@@ -302,5 +286,25 @@ public class StateMachineConfigurationBuilder<S, E>
 	 */
 	public void setTransitionConflictPolicy(TransitionConflictPolicy transitionConflictPolicy) {
 		this.transitionConflictPolicy = transitionConflictPolicy;
+	}
+
+	/**
+	 * Sets the state do action policy and timeout.
+	 *
+	 * @param stateDoActionPolicy the new state do action policy
+	 * @param stateDoActionPolicyTimeout the new state do action policy timeout
+	 */
+	public void setStateDoActionPolicy(StateDoActionPolicy stateDoActionPolicy, Long stateDoActionPolicyTimeout) {
+		this.stateDoActionPolicy = stateDoActionPolicy;
+		this.stateDoActionPolicyTimeout = stateDoActionPolicyTimeout;
+	}
+
+	/**
+	 * Sets the region execution policy.
+	 *
+	 * @param regionExecutionPolicy the region execution policy
+	 */
+	public void setRegionExecutionPolicy(RegionExecutionPolicy regionExecutionPolicy) {
+		this.regionExecutionPolicy = regionExecutionPolicy;
 	}
 }

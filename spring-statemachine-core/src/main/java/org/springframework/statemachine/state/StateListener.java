@@ -1,11 +1,11 @@
 /*
- * Copyright 2016-2018 the original author or authors.
+ * Copyright 2016-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
 package org.springframework.statemachine.state;
 
 import org.springframework.statemachine.StateContext;
+
+import reactor.core.publisher.Mono;
 
 /**
  * {@code StateListener} for various state events.
@@ -47,4 +49,12 @@ public interface StateListener<S, E> {
 	 * @param context the state context
 	 */
 	void onComplete(StateContext<S, E> context);
+
+	/**
+	 * Called when {@link State} want to notify of its completion.
+	 *
+	 * @param context the state context
+	 * @return mono for completion
+	 */
+	Mono<Void> doOnComplete(StateContext<S, E> context);
 }

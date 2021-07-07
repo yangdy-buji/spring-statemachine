@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,12 @@
  */
 package org.springframework.statemachine.buildtests;
 
-import org.junit.Test;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
@@ -30,12 +35,7 @@ public class TimerSmokeTests {
 	}
 
 	private StateMachine<String, String> buildMachine() throws Exception {
-
 		StateMachineBuilder.Builder<String, String> builder = StateMachineBuilder.builder();
-
-		builder.configureConfiguration()
-			.withConfiguration()
-				.taskExecutor(taskExecutor);
 
 		builder.configureStates()
 			.withStates()
@@ -56,12 +56,7 @@ public class TimerSmokeTests {
 	}
 
 	private StateMachine<String, String> buildMachine2() throws Exception {
-
 		StateMachineBuilder.Builder<String, String> builder = StateMachineBuilder.builder();
-
-		builder.configureConfiguration()
-			.withConfiguration()
-				.taskExecutor(taskExecutor);
 
 		builder.configureStates()
 			.withStates()
@@ -91,34 +86,33 @@ public class TimerSmokeTests {
 		StateMachine<String, String> stateMachine;
 		for (int i = 0; i < 20; i++) {
 			stateMachine = buildMachine();
-			stateMachine.start();
+			doStartAndAssert(stateMachine);
 			while (!stateMachine.isComplete()) {
-				stateMachine.sendEvent("repeate");
+				doSendEventAndConsumeAll(stateMachine, "repeate");
 			}
 		}
 	}
 
 	@Test
 	public void testNPE2() throws Exception {
-
 		StateMachine<String, String> stateMachine;
-
 		for (int i = 0; i < 20; i++) {
 			stateMachine = buildMachine2();
-			stateMachine.start();
+			doStartAndAssert(stateMachine);
 			while(!stateMachine.isComplete()) {
-				stateMachine.sendEvent("repeate");
+				doSendEventAndConsumeAll(stateMachine, "repeate");
 			}
-			stateMachine.stop();
+			doStopAndAssert(stateMachine);
 		}
 	}
 
 	@Test
+	@Tag("smoke")
 	public void testDeadlock() throws Exception {
 		StateMachineTestPlan<String, String> plan;
-		for (int i = 0; i < 20; i++) {
+		for (int i = 0; i < 100; i++) {
 			plan = StateMachineTestPlanBuilder.<String, String> builder()
-					.defaultAwaitTime(1)
+					.defaultAwaitTime(5)
 					.stateMachine(buildMachine())
 					.step()
 						.expectStateMachineStarted(1)
@@ -132,8 +126,6 @@ public class TimerSmokeTests {
 					.step()
 						.expectStateEntered(1)
 						.expectStateEntered("end")
-						.and()
-					.step()
 						.expectStateMachineStopped(1)
 						.and()
 					.build();

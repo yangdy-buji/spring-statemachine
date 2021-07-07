@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,25 +15,22 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
@@ -49,6 +46,8 @@ import org.springframework.statemachine.transition.DefaultExternalTransition;
 import org.springframework.statemachine.transition.DefaultLocalTransition;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.statemachine.trigger.EventTrigger;
+
+import reactor.core.publisher.Mono;
 
 public class SubStateMachineTests extends AbstractStateMachineTests {
 
@@ -86,10 +85,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 
 		TestEntryAction entryActionS111 = new TestEntryAction("S111");
 		TestExitAction exitActionS111 = new TestExitAction("S111");
-		Collection<Action<TestStates, TestEvents>> entryActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS111.add(entryActionS111);
-		Collection<Action<TestStates, TestEvents>> exitActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS111.add(exitActionS111);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS111 = new ArrayList<>();
+		entryActionsS111.add(Actions.from(entryActionS111));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS111 = new ArrayList<>();
+		exitActionsS111.add(Actions.from(exitActionS111));
 		State<TestStates,TestEvents> stateS111 = new EnumState<TestStates,TestEvents>(TestStates.S111, null, entryActionsS111, exitActionsS111, pseudoState);
 
 		// submachine 11
@@ -101,10 +100,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		// submachine 1
 		TestEntryAction entryActionS11 = new TestEntryAction("S11");
 		TestExitAction exitActionS11 = new TestExitAction("S11");
-		Collection<Action<TestStates, TestEvents>> entryActionsS11 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS11.add(entryActionS11);
-		Collection<Action<TestStates, TestEvents>> exitActionsS11 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS11.add(exitActionS11);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS11 = new ArrayList<>();
+		entryActionsS11.add(Actions.from(entryActionS11));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS11 = new ArrayList<>();
+		exitActionsS11.add(Actions.from(exitActionS11));
 		StateMachineState<TestStates,TestEvents> stateS11 = new StateMachineState<TestStates,TestEvents>(TestStates.S11, submachine11, null, entryActionsS11, exitActionsS11, pseudoState);
 
 		Collection<State<TestStates,TestEvents>> substates11 = new ArrayList<State<TestStates,TestEvents>>();
@@ -115,10 +114,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		// machine
 		TestEntryAction entryActionS1 = new TestEntryAction("S1");
 		TestExitAction exitActionS1 = new TestExitAction("S1");
-		Collection<Action<TestStates, TestEvents>> entryActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS1.add(entryActionS1);
-		Collection<Action<TestStates, TestEvents>> exitActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS1.add(exitActionS1);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS1 = new ArrayList<>();
+		entryActionsS1.add(Actions.from(entryActionS1));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS1 = new ArrayList<>();
+		exitActionsS1.add(Actions.from(exitActionS1));
 
 		StateMachineState<TestStates,TestEvents> stateS1 = new StateMachineState<TestStates,TestEvents>(TestStates.S1, submachine1, null, entryActionsS1, exitActionsS1, pseudoState);
 		Collection<State<TestStates,TestEvents>> states = new ArrayList<State<TestStates,TestEvents>>();
@@ -130,34 +129,30 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateS1);
 
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
-		submachine1.setTaskExecutor(taskExecutor);
 		submachine1.setBeanFactory(beanFactory);
 		submachine1.afterPropertiesSet();
-		submachine11.setTaskExecutor(taskExecutor);
 		submachine11.setBeanFactory(beanFactory);
 		submachine11.afterPropertiesSet();
 		machine.start();
 
 		machine.sendEvent(TestEvents.E1);
 
-		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
-		assertThat(entryActionS111.stateContexts.size(), is(2));
-		assertThat(exitActionS111.stateContexts.size(), is(1));
-		assertThat(entryActionS11.stateContexts.size(), is(2));
-		assertThat(exitActionS11.stateContexts.size(), is(1));
-		assertThat(entryActionS1.stateContexts.size(), is(1));
-		assertThat(exitActionS1.stateContexts.size(), is(1));
+		assertThat(entryActionS111.stateContexts).hasSize(2);
+		assertThat(exitActionS111.stateContexts).hasSize(1);
+		assertThat(entryActionS11.stateContexts).hasSize(2);
+		assertThat(exitActionS11.stateContexts).hasSize(1);
+		assertThat(entryActionS1.stateContexts).hasSize(1);
+		assertThat(exitActionS1.stateContexts).hasSize(1);
 	}
 
 	@Test
@@ -187,18 +182,19 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 
 		TestEntryAction entryActionS111 = new TestEntryAction("S111");
 		TestExitAction exitActionS111 = new TestExitAction("S111");
-		Collection<Action<TestStates, TestEvents>> entryActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS111.add(entryActionS111);
-		Collection<Action<TestStates, TestEvents>> exitActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS111.add(exitActionS111);
+
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS111 = new ArrayList<>();
+		entryActionsS111.add(Actions.from(entryActionS111));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS111 = new ArrayList<>();
+		exitActionsS111.add(Actions.from(exitActionS111));
 		State<TestStates,TestEvents> stateS111 = new EnumState<TestStates,TestEvents>(TestStates.S111, null, entryActionsS111, exitActionsS111, pseudoState);
 
 		TestEntryAction entryActionS112 = new TestEntryAction("S112");
 		TestExitAction exitActionS112 = new TestExitAction("S112");
-		Collection<Action<TestStates, TestEvents>> entryActionsS112 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS112.add(entryActionS112);
-		Collection<Action<TestStates, TestEvents>> exitActionsS112 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS112.add(exitActionS112);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS112 = new ArrayList<>();
+		entryActionsS112.add(Actions.from(entryActionS112));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS112 = new ArrayList<>();
+		exitActionsS112.add(Actions.from(exitActionS112));
 		State<TestStates,TestEvents> stateS112 = new EnumState<TestStates,TestEvents>(TestStates.S112, null, entryActionsS112, exitActionsS112, null);
 
 		// submachine 1
@@ -211,10 +207,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		// machine
 		TestEntryAction entryActionS1 = new TestEntryAction("S1");
 		TestExitAction exitActionS1 = new TestExitAction("S1");
-		Collection<Action<TestStates, TestEvents>> entryActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS1.add(entryActionS1);
-		Collection<Action<TestStates, TestEvents>> exitActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS1.add(exitActionS1);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS1 = new ArrayList<>();
+		entryActionsS1.add(Actions.from(entryActionS1));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS1 = new ArrayList<>();
+		exitActionsS1.add(Actions.from(exitActionS1));
 
 		StateMachineState<TestStates,TestEvents> stateS1 = new StateMachineState<TestStates,TestEvents>(TestStates.S1, submachine11, null, entryActionsS1, exitActionsS1, pseudoState);
 		Collection<State<TestStates,TestEvents>> states = new ArrayList<State<TestStates,TestEvents>>();
@@ -226,31 +222,28 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateS1);
 
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
-		submachine11.setTaskExecutor(taskExecutor);
 		submachine11.setBeanFactory(beanFactory);
 		submachine11.afterPropertiesSet();
 		machine.start();
 
 		machine.sendEvent(TestEvents.E1);
 
-		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS112.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS112.onExecuteLatch.await(1, TimeUnit.SECONDS), is(false));
-		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(false));
+		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS112.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS112.onExecuteLatch.await(1, TimeUnit.SECONDS)).isFalse();
+		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isFalse();
 
-		assertThat(entryActionS111.stateContexts.size(), is(1));
-		assertThat(exitActionS111.stateContexts.size(), is(1));
-		assertThat(entryActionS112.stateContexts.size(), is(1));
-		assertThat(exitActionS112.stateContexts.size(), is(0));
-		assertThat(entryActionS1.stateContexts.size(), is(1));
-		assertThat(exitActionS1.stateContexts.size(), is(0));
+		assertThat(entryActionS111.stateContexts).hasSize(1);
+		assertThat(exitActionS111.stateContexts).hasSize(1);
+		assertThat(entryActionS112.stateContexts).hasSize(1);
+		assertThat(exitActionS112.stateContexts).isEmpty();
+		assertThat(entryActionS1.stateContexts).hasSize(1);
+		assertThat(exitActionS1.stateContexts).isEmpty();
 	}
 
 
@@ -283,10 +276,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 
 		TestEntryAction entryActionS111 = new TestEntryAction("S111");
 		TestExitAction exitActionS111 = new TestExitAction("S111");
-		Collection<Action<TestStates, TestEvents>> entryActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS111.add(entryActionS111);
-		Collection<Action<TestStates, TestEvents>> exitActionsS111 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS111.add(exitActionS111);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS111 = new ArrayList<>();
+		entryActionsS111.add(Actions.from(entryActionS111));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS111 = new ArrayList<>();
+		exitActionsS111.add(Actions.from(exitActionS111));
 		State<TestStates,TestEvents> stateS111 = new EnumState<TestStates,TestEvents>(TestStates.S111, null, entryActionsS111, exitActionsS111, pseudoState);
 
 		// submachine 11
@@ -298,10 +291,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		// submachine 1
 		TestEntryAction entryActionS11 = new TestEntryAction("S11");
 		TestExitAction exitActionS11 = new TestExitAction("S11");
-		Collection<Action<TestStates, TestEvents>> entryActionsS11 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS11.add(entryActionS11);
-		Collection<Action<TestStates, TestEvents>> exitActionsS11 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS11.add(exitActionS11);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS11 = new ArrayList<>();
+		entryActionsS11.add(Actions.from(entryActionS11));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS11 = new ArrayList<>();
+		exitActionsS11.add(Actions.from(exitActionS11));
 		StateMachineState<TestStates,TestEvents> stateS11 = new StateMachineState<TestStates,TestEvents>(TestStates.S11, submachine11, null, entryActionsS11, exitActionsS11, pseudoState);
 
 		Collection<State<TestStates,TestEvents>> substates11 = new ArrayList<State<TestStates,TestEvents>>();
@@ -312,10 +305,10 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		// machine
 		TestEntryAction entryActionS1 = new TestEntryAction("S1");
 		TestExitAction exitActionS1 = new TestExitAction("S1");
-		Collection<Action<TestStates, TestEvents>> entryActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		entryActionsS1.add(entryActionS1);
-		Collection<Action<TestStates, TestEvents>> exitActionsS1 = new ArrayList<Action<TestStates, TestEvents>>();
-		exitActionsS1.add(exitActionS1);
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> entryActionsS1 = new ArrayList<>();
+		entryActionsS1.add(Actions.from(entryActionS1));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> exitActionsS1 = new ArrayList<>();
+		exitActionsS1.add(Actions.from(exitActionS1));
 
 		StateMachineState<TestStates,TestEvents> stateS1 = new StateMachineState<TestStates,TestEvents>(TestStates.S1, submachine1, null, entryActionsS1, exitActionsS1, pseudoState);
 		Collection<State<TestStates,TestEvents>> states = new ArrayList<State<TestStates,TestEvents>>();
@@ -327,41 +320,37 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateS1);
 
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
-		submachine1.setTaskExecutor(taskExecutor);
 		submachine1.setBeanFactory(beanFactory);
 		submachine1.afterPropertiesSet();
-		submachine11.setTaskExecutor(taskExecutor);
 		submachine11.setBeanFactory(beanFactory);
 		submachine11.afterPropertiesSet();
 		machine.start();
 
 		machine.sendEvent(TestEvents.E1);
 
-		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(false));
+		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isFalse();
 
-		assertThat(entryActionS111.stateContexts.size(), is(2));
-		assertThat(exitActionS111.stateContexts.size(), is(1));
-		assertThat(entryActionS11.stateContexts.size(), is(1));
-		assertThat(exitActionS11.stateContexts.size(), is(1));
-		assertThat(entryActionS1.stateContexts.size(), is(1));
-		assertThat(exitActionS1.stateContexts.size(), is(0));
+		assertThat(entryActionS111.stateContexts).hasSize(2);
+		assertThat(exitActionS111.stateContexts).hasSize(1);
+		assertThat(entryActionS11.stateContexts).hasSize(1);
+		assertThat(exitActionS11.stateContexts).hasSize(1);
+		assertThat(entryActionS1.stateContexts).hasSize(1);
+		assertThat(exitActionS1.stateContexts).isEmpty();
 	}
 
 	@Test
 	public void testExternalTransition3() throws Exception {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -377,49 +366,49 @@ public class SubStateMachineTests extends AbstractStateMachineTests {
 		TestEntryAction entryActionS1 = context.getBean("entryActionS1", TestEntryAction.class);
 		TestExitAction exitActionS1 = context.getBean("exitActionS1", TestExitAction.class);
 
-		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(entryActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS111.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS11.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(entryActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(exitActionS1.onExecuteLatch.await(1, TimeUnit.SECONDS)).isTrue();
 
-		assertThat(entryActionS111.stateContexts.size(), is(2));
-		assertThat(exitActionS111.stateContexts.size(), is(1));
-		assertThat(entryActionS11.stateContexts.size(), is(2));
-		assertThat(exitActionS11.stateContexts.size(), is(1));
-		assertThat(entryActionS1.stateContexts.size(), is(1));
-		assertThat(exitActionS1.stateContexts.size(), is(1));
+		assertThat(entryActionS111.stateContexts).hasSize(2);
+		assertThat(exitActionS111.stateContexts).hasSize(1);
+		assertThat(entryActionS11.stateContexts).hasSize(2);
+		assertThat(exitActionS11.stateContexts).hasSize(1);
+		assertThat(entryActionS1.stateContexts).hasSize(1);
+		assertThat(exitActionS1.stateContexts).hasSize(1);
 
 	}
 
 	@Test
 	public void testMixedStates() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S1, TestStates.S10));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1, TestStates.S10);
 	}
 
 	@Test
 	public void testStateChangeWithinMachine() {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		@SuppressWarnings("unchecked")
 		ObjectStateMachine<TestStates2,TestEvents2> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		machine.start();
-		assertThat(machine, notNullValue());
-		assertThat(machine.getState().getIds(), contains(TestStates2.IDLE, TestStates2.CLOSED));
+		assertThat(machine).isNotNull();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates2.IDLE, TestStates2.CLOSED);
 		machine.sendEvent(TestEvents2.EJECT);
-		assertThat(machine.getState().getIds(), contains(TestStates2.IDLE, TestStates2.OPEN));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates2.IDLE, TestStates2.OPEN);
 	}
 
 	@Configuration

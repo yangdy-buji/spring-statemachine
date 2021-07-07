@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,21 +15,24 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.Test;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -38,6 +41,8 @@ import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
 
 public class EventDeferTests extends AbstractStateMachineTests {
+
+	private static final Log log = LogFactory.getLog(EventDeferTests.class);
 
 	@Override
 	protected AnnotationConfigApplicationContext buildContext() {
@@ -48,270 +53,241 @@ public class EventDeferTests extends AbstractStateMachineTests {
 	public void testDeferWithFlat() throws Exception {
 		context.register(Config2.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		machine.sendEvent("E3");
-		machine.sendEvent("E1");
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, "E3");
+		doSendEventAndConsumeAll(machine, "E1");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(1));
-		machine.sendEvent("E2");
-		assertThat(readField.size(), is(2));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).hasSize(1);
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(readField).hasSize(2);
 	}
 
 	@Test
-	public void testDeferWithFlatThreadExecutor() throws Exception {
-		context.register(Config2.class, ExecutorConfig.class);
+	@Tag("smoke")
+	@Timeout(value = 20, unit = TimeUnit.SECONDS)
+	public void testDeferSmokeExecutorConcurrentModification() throws Exception {
+		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		TestListener listener = new TestListener();
-		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
 
-		listener.reset(1, 0, 0, 0);
-		machine.sendEvent("E3");
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
+		StateMachine<String, String> machine = resolveMachine(context);
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly("S1");
 
-		machine.sendEvent("E1");
-		machine.sendEvent("E1");
-		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(2));
-		machine.sendEvent("E2");
-		assertThat(readField.size(), is(3));
+		AtomicReference<Throwable> error = new AtomicReference<>();
+		AtomicInteger i1 = new AtomicInteger();
+		Thread t1 = new Thread(() -> {
+			while(i1.incrementAndGet() < 200) {
+				try {
+					doSendEventAndConsumeAll(machine, "E1");
+					doSendEventAndConsumeAll(machine, "E2");
+				} catch (Throwable e) {
+					log.error("T1: error " + e);
+					error.set(e);
+					break;
+				}
+			}
+		});
+		AtomicInteger i2 = new AtomicInteger();
+		Thread t2 = new Thread(() -> {
+			while(i2.incrementAndGet() < 200) {
+				try {
+					doSendEventAndConsumeAll(machine, "E1");
+					doSendEventAndConsumeAll(machine, "E2");
+				} catch (Throwable e) {
+					log.error("T2: error " + e);
+					error.set(e);
+					break;
+				}
+			}
+		});
+		t1.start();
+		t2.start();
+		t1.join();
+		t2.join();
+		assertThat(error.get()).isNull();
 	}
 
 	@Test
 	public void testDeferWithSubsSyncExecutor() throws Exception {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener.reset(0, 0, 0, 1);
-		machine.sendEvent("E3");
-		assertThat(listener.sub3readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.sub3readyStateEnteredCount, is(1));
+		doSendEventAndConsumeAll(machine, "E3");
+		assertThat(listener.sub3readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.sub3readyStateEnteredCount).isEqualTo(1);
 
-		machine.sendEvent("E1");
-
-		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(1));
-
-		listener.reset(0, 0, 2, 0);
-		machine.sendEvent("E4");
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
-
-		assertThat(machine.getState().getIds(), contains("READY"));
-	}
-
-	@Test
-	public void testDeferWithSubsThreadExecutor() throws Exception {
-		context.register(Config1.class, ExecutorConfig2.class);
-		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		TestListener listener = new TestListener();
-		machine.addStateListener(listener);
-		machine.start();
-
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
-
-		listener.reset(0, 0, 0, 1);
-		machine.sendEvent("E3");
-		assertThat(listener.sub3readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.sub3readyStateEnteredCount, is(1));
-
-		listener.reset(0, 0, 2, 0);
-		machine.sendEvent("E1");
-		machine.sendEvent("E1");
+		doSendEventAndConsumeAll(machine, "E1");
 
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(2));
-
-		listener.reset(0, 0, 3, 0);
-		machine.sendEvent("E4");
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(3));
-
-		assertThat(machine.getState().getIds(), contains("READY"));
-	}
-
-	@Test
-	public void testDeferWithSubs2ThreadExecutor() throws Exception {
-		context.register(Config1.class, ExecutorConfig.class);
-		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		TestListener listener = new TestListener();
-		machine.addStateListener(listener);
-		machine.start();
-
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).hasSize(1);
 
 		listener.reset(0, 0, 2, 0);
-		machine.sendEvent("E2");
-		machine.sendEvent("E2");
+		doSendEventAndConsumeAll(machine, "E4");
+		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(2);
 
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
-
-		assertThat(machine.getState().getIds(), contains("READY"));
-	}
-
-	@Test
-	public void testDeferWithSubs2ThreadExecutorSmoke() throws Exception {
-		// smoke above test to see threading issues
-		for (int i = 0; i < 500; i++) {
-			setup();
-			testDeferWithSubs2ThreadExecutor();
-			clean();
-		}
+		assertThat(machine.getState().getIds()).containsExactly("READY");
 	}
 
 	@Test
 	public void testSubNotDeferOverrideSuperTransition() throws Exception {
 		context.register(Config3.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), contains("SUB1", "SUB11"));
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsExactly("SUB1", "SUB11");
 
 		// sub doesn't defer
-		machine.sendEvent("E15");
+		doSendEventAndConsumeAll(machine, "E15");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(0));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).isEmpty();
 
-		assertThat(machine.getState().getIds(), contains("SUB5"));
+		assertThat(machine.getState().getIds()).containsExactly("SUB5");
 	}
 
 	@Test
 	public void testSubDeferOverrideSuperTransition() throws Exception {
 		context.register(Config3.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), contains("SUB1", "SUB11"));
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsExactly("SUB1", "SUB11");
 
-		machine.sendEvent("E1112");
-		assertThat(machine.getState().getIds(), contains("SUB1", "SUB12"));
+		doSendEventAndConsumeAll(machine, "E1112");
+		assertThat(machine.getState().getIds()).containsExactly("SUB1", "SUB12");
 
 		// sub defers
-		machine.sendEvent("E15");
+		doSendEventAndConsumeAll(machine, "E15");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(1));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).hasSize(1);
 
-		assertThat(machine.getState().getIds(), contains("SUB1", "SUB12"));
+		assertThat(machine.getState().getIds()).containsExactly("SUB1", "SUB12");
 
 		// from SUB12 to SUB11 should then cause E15 to fire in root
 		// causing SUB1 to SUB5
-		machine.sendEvent("E1211");
-		assertThat(machine.getState().getIds(), contains("SUB5"));
+		doSendEventAndConsumeAll(machine, "E1211");
+		assertThat(machine.getState().getIds()).containsExactly("SUB5");
 	}
 
 	@Test
 	public void testRegionOneDeferTransition() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB111", "SUB1", "SUB121"));
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("SUB111", "SUB1", "SUB121");
 
-		machine.sendEvent("E5");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB112", "SUB1", "SUB121"));
+		doSendEventAndConsumeAll(machine, "E5");
+		assertThat(machine.getState().getIds()).containsOnly("SUB112", "SUB1", "SUB121");
 
 		// regions defers
-		machine.sendEvent("E3");
+		doSendEventAndConsumeAll(machine, "E3");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(0));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).isEmpty();
 	}
 
 	@Test
 	public void testRegionAllDeferTransition() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB111", "SUB1", "SUB121"));
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("SUB111", "SUB1", "SUB121");
 
-		machine.sendEvent("E5");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB112", "SUB1", "SUB121"));
+		doSendEventAndConsumeAll(machine, "E5");
+		assertThat(machine.getState().getIds()).containsOnly("SUB112", "SUB1", "SUB121");
 
-		machine.sendEvent("E8");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB112", "SUB1", "SUB122"));
+		doSendEventAndConsumeAll(machine, "E8");
+		assertThat(machine.getState().getIds()).containsOnly("SUB112", "SUB1", "SUB122");
 
 		// regions defers
-		machine.sendEvent("E3");
+		doSendEventAndConsumeAll(machine, "E3");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(1));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).hasSize(1);
 	}
 
 	@Test
 	public void testRegionNotDeferTransition() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("SUB111", "SUB1", "SUB121"));
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("SUB111", "SUB1", "SUB121");
 
 		// regions doesn't defer
-		machine.sendEvent("E3");
+		doSendEventAndConsumeAll(machine, "E3");
 		Object executor = TestUtils.readField("stateMachineExecutor", machine);
-		List<?> readField = TestUtils.readField("deferList", executor);
-		assertThat(readField.size(), is(0));
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).isEmpty();
 
-		assertThat(machine.getState().getIds(), contains("SUB2"));
+		assertThat(machine.getState().getIds()).containsExactly("SUB2");
+	}
+
+	@Test
+	public void testDeferEventCleared() throws Exception {
+		context.register(Config5.class);
+		context.refresh();
+		StateMachine<String, String> machine = resolveMachine(context);
+
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		Object executor = TestUtils.readField("stateMachineExecutor", machine);
+		Collection<?> readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).hasSize(1);
+
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		readField = TestUtils.readField("deferList", executor);
+		assertThat(readField).isEmpty();
+
+		// deferred event handled so should not get back to S1
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2");
 	}
 
 	@Configuration
@@ -543,29 +519,29 @@ public class EventDeferTests extends AbstractStateMachineTests {
 	}
 
 	@Configuration
-	static class ExecutorConfig {
+	@EnableStateMachine
+	static class Config5 extends StateMachineConfigurerAdapter<String, String> {
 
-		@Bean(name=StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-			taskExecutor.setCorePoolSize(1);
-			taskExecutor.setMaxPoolSize(1);
-			return taskExecutor;
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("S1")
+					.state("S1", "E2")
+					.state("S2");
 		}
 
-	}
-
-	@Configuration
-	static class ExecutorConfig2 {
-
-		@Bean(name=StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-			taskExecutor.setCorePoolSize(1);
-			taskExecutor.setMaxPoolSize(4);
-			return taskExecutor;
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("S1").target("S2")
+					.event("E1")
+					.and()
+				.withExternal()
+					.source("S2").target("S1")
+					.event("E2");
 		}
-
 	}
 
 	static class TestListener extends StateMachineListenerAdapter<String, String> {

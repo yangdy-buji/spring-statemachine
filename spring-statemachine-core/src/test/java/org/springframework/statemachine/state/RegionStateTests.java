@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +15,14 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
 import org.springframework.statemachine.region.Region;
@@ -70,10 +67,8 @@ public class RegionStateTests extends AbstractStateMachineTests {
 		transitions.add(transitionFromS1ToS2);
 		transitions.add(transitionFromS2ToS3);
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateSI);
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
 		machine.start();
@@ -82,12 +77,12 @@ public class RegionStateTests extends AbstractStateMachineTests {
 		regions.add(machine);
 		RegionState<TestStates,TestEvents> state = new RegionState<TestStates,TestEvents>(TestStates.S11, regions);
 
-		assertThat(state.isSimple(), is(false));
-		assertThat(state.isComposite(), is(true));
-		assertThat(state.isOrthogonal(), is(false));
-		assertThat(state.isSubmachineState(), is(false));
+		assertThat(state.isSimple()).isFalse();
+		assertThat(state.isComposite()).isTrue();
+		assertThat(state.isOrthogonal()).isFalse();
+		assertThat(state.isSubmachineState()).isFalse();
 
-		assertThat(state.getIds(), containsInAnyOrder(TestStates.SI, TestStates.S11));
+		assertThat(state.getIds()).containsOnly(TestStates.SI, TestStates.S11);
 
 
 

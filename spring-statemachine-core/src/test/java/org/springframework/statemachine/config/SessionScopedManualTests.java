@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,26 +15,24 @@
  */
 package org.springframework.statemachine.config;
 
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.TestUtils;
@@ -43,7 +41,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.MethodMode;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -53,7 +51,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.WebApplicationContext;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+import reactor.core.publisher.Mono;
+
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration
 @WebAppConfiguration
 @DirtiesContext(methodMode = MethodMode.AFTER_METHOD)
@@ -64,7 +64,7 @@ public class SessionScopedManualTests {
 
 	private MockMvc mvc;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		mvc = MockMvcBuilders.webAppContextSetup(context).build();
 	}
@@ -77,11 +77,11 @@ public class SessionScopedManualTests {
 		mvc.
 			perform(get("/state").session(session1)).
 			andExpect(status().isOk()).
-			andExpect(content().string(is("S1")));
+			andExpect(content().string("S1"));
 		mvc.
 			perform(get("/state").session(session2)).
 			andExpect(status().isOk()).
-			andExpect(content().string(is("S1")));
+			andExpect(content().string("S1"));
 
 		mvc.
 			perform(post("/state").session(session1).param("event", "E1")).
@@ -93,11 +93,11 @@ public class SessionScopedManualTests {
 		mvc.
 			perform(get("/state").session(session1)).
 			andExpect(status().isOk()).
-			andExpect(content().string(is("S2")));
+			andExpect(content().string("S2"));
 		mvc.
 			perform(get("/state").session(session2)).
 			andExpect(status().isOk()).
-			andExpect(content().string(is("S2")));
+			andExpect(content().string("S2"));
 	}
 
 	@Test
@@ -106,12 +106,12 @@ public class SessionScopedManualTests {
 		mvc.
 			perform(get("/state").session(session1)).
 			andExpect(status().isOk()).
-			andExpect(content().string(is("S1")));
+			andExpect(content().string("S1"));
 		Object machine = session1.getAttribute("scopedTarget.stateMachine");
-		assertThat(machine, notNullValue());
-		assertThat(TestUtils.readField("running", machine), is(true));
+		assertThat(machine).isNotNull();
+		assertThat(TestUtils.<Boolean>callMethod("isRunning", machine)).isTrue();
 		session1.invalidate();
-		assertThat(TestUtils.readField("running", machine), is(false));
+		assertThat(TestUtils.<Boolean>callMethod("isRunning", machine)).isFalse();
 	}
 
 	@Test
@@ -121,8 +121,8 @@ public class SessionScopedManualTests {
 			perform(get("/ping").session(session1)).
 			andExpect(status().isOk());
 		Object machine = session1.getAttribute("scopedTarget.stateMachine");
-		assertThat(machine, notNullValue());
-		assertThat(TestUtils.callMethod("isRunning", machine), is(true));
+		assertThat(machine).isNotNull();
+		assertThat(TestUtils.<Boolean>callMethod("isRunning", machine)).isTrue();
 	}
 
 	@Configuration
@@ -134,8 +134,7 @@ public class SessionScopedManualTests {
 			Builder<String, String> builder = StateMachineBuilder.builder();
 			builder.configureConfiguration()
 				.withConfiguration()
-					.autoStartup(true)
-					.taskExecutor(new SyncTaskExecutor());
+					.autoStartup(true);
 			builder.configureStates()
 				.withStates()
 					.initial("S1").state("S2");
@@ -170,7 +169,10 @@ public class SessionScopedManualTests {
 
 		@RequestMapping(path="/state", method=RequestMethod.POST)
 		public HttpEntity<Void> setState(@RequestParam("event") String event) {
-			stateMachine.sendEvent(event);
+			stateMachine
+				.sendEvent(Mono.just(MessageBuilder
+					.withPayload(event).build()))
+				.subscribe();
 			return new ResponseEntity<Void>(HttpStatus.ACCEPTED);
 		}
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,22 @@
  */
 package org.springframework.statemachine.action;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -40,21 +38,19 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 
 public class SpelExpressionActionTests extends AbstractStateMachineTests {
 
-	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testSpelActionSendsEvent() throws Exception {
 		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(Config1.class);
-		assertTrue(ctx.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<TestStates,TestEvents> machine =
-				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(ctx);
+		doStartAndAssert(machine);
 		TestStateMachineListener listener = new TestStateMachineListener();
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 		listener.reset(2, 0);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(listener.stateChangedLatch.await(5, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), contains(TestStates.S3));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.stateChangedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S3);
 		ctx.close();
 	}
 

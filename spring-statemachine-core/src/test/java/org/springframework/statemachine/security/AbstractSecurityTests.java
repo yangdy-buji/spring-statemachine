@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,13 @@
  */
 package org.springframework.statemachine.security;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeResultAsDenied;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
@@ -37,27 +36,39 @@ import org.springframework.statemachine.state.State;
 public abstract class AbstractSecurityTests extends AbstractStateMachineTests {
 
 	protected static void assertTransitionAllowed(StateMachine<States, Events> machine, TestListener listener) throws Exception {
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1);
 	}
 
 	protected static void assertTransitionDenied(StateMachine<States, Events> machine, TestListener listener) throws Exception {
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(false));
-		assertThat(listener.stateChangedCount, is(0));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isFalse();
+		assertThat(listener.stateChangedCount).isZero();
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
+	}
+
+	protected static void assertTransitionDeniedResultAsDenied(StateMachine<States, Events> machine, TestListener listener) throws Exception {
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
+
+		listener.reset(1);
+		doSendEventAndConsumeResultAsDenied(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isFalse();
+		assertThat(listener.stateChangedCount).isZero();
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 	}
 
 	protected static enum States {
@@ -97,8 +108,7 @@ public abstract class AbstractSecurityTests extends AbstractStateMachineTests {
 		StateMachineConfigurationConfigurer<States, Events> configureConfiguration = builder.configureConfiguration();
 		configureConfiguration.withConfiguration()
 				.listener(listener)
-				.autoStartup(true)
-				.taskExecutor(new SyncTaskExecutor());
+				.autoStartup(true);
 
 		SecurityConfigurer<States, Events> withSecurity = configureConfiguration.withSecurity();
 		withSecurity.enabled(true);

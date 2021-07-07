@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,19 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
@@ -43,38 +44,36 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 public class SubmachineRefTests extends AbstractStateMachineTests {
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testSubmachineRef() throws Exception {
 		context.register(Config2.class, Config1.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S1"));
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S20"));
-		machine.sendEvent("E2");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21", "S30"));
-		machine.sendEvent("E3");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21", "S31"));
+		StateMachine<String, String> machine = resolveMachine(context);
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S20");
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21", "S30");
+		doSendEventAndConsumeAll(machine, "E3");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21", "S31");
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testSubmachineRefWithFactory() throws Exception {
 		context.register(Config4.class, Config3.class);
 		context.refresh();
-		StateMachineFactory<String, String> factory = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINEFACTORY, StateMachineFactory.class);
+		StateMachineFactory<String, String> factory = resolveFactory(context);
 		StateMachine<String, String> machine = factory.getStateMachine();
-		assertThat(machine, notNullValue());
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S1"));
-		machine.sendEvent("E1");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S20"));
-		machine.sendEvent("E2");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21", "S30"));
-		machine.sendEvent("E3");
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S2", "S21", "S31"));
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
+		doSendEventAndConsumeAll(machine, "E1");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S20");
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21", "S30");
+		doSendEventAndConsumeAll(machine, "E3");
+		assertThat(machine.getState().getIds()).containsOnly("S2", "S21", "S31");
 	}
 
 	@Configuration

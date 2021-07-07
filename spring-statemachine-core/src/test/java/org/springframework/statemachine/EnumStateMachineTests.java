@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,20 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.function.Function;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.state.DefaultPseudoState;
 import org.springframework.statemachine.state.EnumState;
 import org.springframework.statemachine.state.PseudoState;
@@ -38,6 +38,8 @@ import org.springframework.statemachine.transition.DefaultExternalTransition;
 import org.springframework.statemachine.transition.DefaultInternalTransition;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.statemachine.trigger.EventTrigger;
+
+import reactor.core.publisher.Mono;
 
 public class EnumStateMachineTests extends AbstractStateMachineTests {
 
@@ -57,18 +59,18 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 
 		Collection<Transition<TestStates,TestEvents>> transitions = new ArrayList<Transition<TestStates,TestEvents>>();
 
-		Collection<Action<TestStates,TestEvents>> actionsFromSIToS1 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromSIToS1.add(new LoggingAction("actionsFromSIToS1"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromSIToS1 = new ArrayList<>();
+		actionsFromSIToS1.add(Actions.from(new LoggingAction("actionsFromSIToS1")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromSIToS1 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateSI, stateS1, actionsFromSIToS1, TestEvents.E1, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E1));
 
-		Collection<Action<TestStates,TestEvents>> actionsFromS1ToS2 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromS1ToS2.add(new LoggingAction("actionsFromS1ToS2"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromS1ToS2 = new ArrayList<>();
+		actionsFromS1ToS2.add(Actions.from(new LoggingAction("actionsFromS1ToS2")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromS1ToS2 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateS1, stateS2, actionsFromS1ToS2, TestEvents.E2, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E2));
 
-		Collection<Action<TestStates,TestEvents>> actionsFromS2ToS3 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromS1ToS2.add(new LoggingAction("actionsFromS2ToS3"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromS2ToS3 = new ArrayList<>();
+		actionsFromS1ToS2.add(Actions.from(new LoggingAction("actionsFromS2ToS3")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromS2ToS3 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateS2, stateS3, actionsFromS2ToS3, TestEvents.E3, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E3));
 
@@ -76,36 +78,34 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 		transitions.add(transitionFromS1ToS2);
 		transitions.add(transitionFromS2ToS3);
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateSI);
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
 		machine.start();
 
 		State<TestStates,TestEvents> initialState = machine.getInitialState();
-		assertThat(initialState, is(stateSI));
+		assertThat(initialState).isEqualTo(stateSI);
 
 		State<TestStates,TestEvents> state = machine.getState();
-		assertThat(state, is(stateSI));
+		assertThat(state).isEqualTo(stateSI);
 
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
 		state = machine.getState();
-		assertThat(state, is(stateS1));
+		assertThat(state).isEqualTo(stateS1);
 
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E2).build());
 		state = machine.getState();
-		assertThat(state, is(stateS2));
+		assertThat(state).isEqualTo(stateS2);
 
 		// not processed
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
 		state = machine.getState();
-		assertThat(state, is(stateS2));
+		assertThat(state).isEqualTo(stateS2);
 
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E3).build());
 		state = machine.getState();
-		assertThat(state, is(stateS3));
+		assertThat(state).isEqualTo(stateS3);
 	}
 
 	@Test
@@ -131,18 +131,18 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 		// transitions
 		Collection<Transition<TestStates,TestEvents>> transitions = new ArrayList<Transition<TestStates,TestEvents>>();
 
-		Collection<Action<TestStates,TestEvents>> actionsFromSIToS1 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromSIToS1.add(new LoggingAction("actionsFromSIToS1"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromSIToS1 = new ArrayList<>();
+		actionsFromSIToS1.add(Actions.from(new LoggingAction("actionsFromSIToS1")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromSIToS1 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateSI, stateS1, actionsFromSIToS1, TestEvents.E1, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E1));
 
-		Collection<Action<TestStates,TestEvents>> actionsFromS1ToS2 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromS1ToS2.add(new LoggingAction("actionsFromS1ToS2"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromS1ToS2 = new ArrayList<>();
+		actionsFromS1ToS2.add(Actions.from(new LoggingAction("actionsFromS1ToS2")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromS1ToS2 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateS1, stateS2, actionsFromS1ToS2, TestEvents.E2, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E2));
 
-		Collection<Action<TestStates,TestEvents>> actionsFromS2ToS3 = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsFromS1ToS2.add(new LoggingAction("actionsFromS2ToS3"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsFromS2ToS3 = new ArrayList<>();
+		actionsFromS1ToS2.add(Actions.from(new LoggingAction("actionsFromS2ToS3")));
 		DefaultExternalTransition<TestStates,TestEvents> transitionFromS2ToS3 =
 				new DefaultExternalTransition<TestStates,TestEvents>(stateS2, stateS3, actionsFromS2ToS3, TestEvents.E3, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E3));
 
@@ -151,30 +151,28 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 		transitions.add(transitionFromS2ToS3);
 
 		// create machine
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateSI);
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
 		machine.start();
 
 		State<TestStates,TestEvents> initialState = machine.getInitialState();
-		assertThat(initialState, is(stateSI));
+		assertThat(initialState).isEqualTo(stateSI);
 
 		State<TestStates,TestEvents> state = machine.getState();
-		assertThat(state, is(stateSI));
+		assertThat(state).isEqualTo(stateSI);
 
 
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E2).build());
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E3).build());
 		state = machine.getState();
-		assertThat(state, is(stateSI));
+		assertThat(state).isEqualTo(stateSI);
 
 
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
 		state = machine.getState();
-		assertThat(state, is(stateS3));
+		assertThat(state).isEqualTo(stateS3);
 	}
 
 	@Test
@@ -185,8 +183,8 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 		Collection<State<TestStates,TestEvents>> states = new ArrayList<State<TestStates,TestEvents>>();
 		states.add(stateSI);
 
-		Collection<Action<TestStates,TestEvents>> actionsInSI = new ArrayList<Action<TestStates,TestEvents>>();
-		actionsInSI.add(new LoggingAction("actionsInSI"));
+		Collection<Function<StateContext<TestStates, TestEvents>, Mono<Void>>> actionsInSI = new ArrayList<>();
+		actionsInSI.add(Actions.from(new LoggingAction("actionsInSI")));
 		DefaultInternalTransition<TestStates,TestEvents> transitionInternalSI =
 				new DefaultInternalTransition<TestStates,TestEvents>(stateSI, actionsInSI, TestEvents.E1, null, new EventTrigger<TestStates,TestEvents>(TestEvents.E1));
 
@@ -194,10 +192,8 @@ public class EnumStateMachineTests extends AbstractStateMachineTests {
 		Collection<Transition<TestStates,TestEvents>> transitions = new ArrayList<Transition<TestStates,TestEvents>>();
 		transitions.add(transitionInternalSI);
 
-		SyncTaskExecutor taskExecutor = new SyncTaskExecutor();
 		BeanFactory beanFactory = new DefaultListableBeanFactory();
 		ObjectStateMachine<TestStates, TestEvents> machine = new ObjectStateMachine<TestStates, TestEvents>(states, transitions, stateSI);
-		machine.setTaskExecutor(taskExecutor);
 		machine.setBeanFactory(beanFactory);
 		machine.afterPropertiesSet();
 		machine.start();

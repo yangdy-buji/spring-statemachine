@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,19 @@
  */
 package demo.washer;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -54,47 +55,47 @@ public class WasherTests {
 	public void testInitialState() throws Exception {
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
 		listener.stateEnteredLatch.await(1, TimeUnit.SECONDS);
-		assertThat(machine.getState().getIds(), contains(States.RUNNING, States.WASHING));
-		assertThat(listener.statesEntered.size(), is(2));
-		assertThat(listener.statesEntered.get(0).getId(), is(States.RUNNING));
-		assertThat(listener.statesEntered.get(1).getId(), is(States.WASHING));
-		assertThat(listener.statesExited.size(), is(0));
+		assertThat(machine.getState().getIds()).containsExactly(States.RUNNING, States.WASHING);
+		assertThat(listener.statesEntered).hasSize(2);
+		assertThat(listener.statesEntered.get(0).getId()).isEqualTo(States.RUNNING);
+		assertThat(listener.statesEntered.get(1).getId()).isEqualTo(States.WASHING);
+		assertThat(listener.statesExited).isEmpty();
 	}
 
 	@Test
 	public void testRinse() throws Exception {
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.RINSE);
+		doSendEventAndConsumeAll(machine, Events.RINSE);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
-		assertThat(machine.getState().getIds(), contains(States.RUNNING, States.RINSING));
+		assertThat(machine.getState().getIds()).containsExactly(States.RUNNING, States.RINSING);
 	}
 
 	@Test
 	public void testRinseCutPower() throws Exception {
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.RINSE);
+		doSendEventAndConsumeAll(machine, Events.RINSE);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
 
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.CUTPOWER);
+		doSendEventAndConsumeAll(machine, Events.CUTPOWER);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
-		assertThat(machine.getState().getIds(), contains(States.POWEROFF));
+		assertThat(machine.getState().getIds()).containsExactly(States.POWEROFF);
 	}
 
 	@Test
 	public void testRinseCutRestorePower() throws Exception {
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.RINSE);
+		doSendEventAndConsumeAll(machine, Events.RINSE);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
 
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.CUTPOWER);
+		doSendEventAndConsumeAll(machine, Events.CUTPOWER);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
 
 		listener.reset(1, 0, 0);
-		machine.sendEvent(Events.RESTOREPOWER);
+		doSendEventAndConsumeAll(machine, Events.RESTOREPOWER);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
-		assertThat(machine.getState().getIds(), contains(States.RUNNING, States.RINSING));
+		assertThat(machine.getState().getIds()).containsExactly(States.RUNNING, States.RINSING);
 	}
 
 	static class Config {
@@ -163,19 +164,19 @@ public class WasherTests {
 	}
 
 	@SuppressWarnings("unchecked")
-	@Before
+	@BeforeEach
 	public void setup() {
 		context = new AnnotationConfigApplicationContext();
 		context.register(CommonConfiguration.class, Application.class, Config.class);
 		context.refresh();
 		machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		listener = context.getBean(TestListener.class);
-		machine.start();
+		doStartAndAssert(machine);
 	}
 
-	@After
+	@AfterEach
 	public void clean() {
-		machine.stop();
+		doStopAndAssert(machine);
 		context.close();
 		context = null;
 		machine = null;

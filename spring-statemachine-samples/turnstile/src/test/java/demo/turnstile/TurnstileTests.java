@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,18 @@
  */
 package demo.turnstile;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.doStopAndAssert;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -54,18 +54,18 @@ public class TurnstileTests {
 
 	@Test
 	public void testNotStarted() throws Exception {
-		assertThat(commands.state(), is("No state"));
+		assertThat(commands.state()).isEqualTo("No state");
 	}
 
 	@Test
 	public void testInitialState() throws Exception {
-		machine.start();
+		doStartAndAssert(machine);
 		listener.stateChangedLatch.await(1, TimeUnit.SECONDS);
 		listener.stateEnteredLatch.await(1, TimeUnit.SECONDS);
-		assertThat(machine.getState().getIds(), contains(States.LOCKED));
-		assertThat(listener.statesEntered.size(), is(1));
-		assertThat(listener.statesEntered.get(0).getId(), is(States.LOCKED));
-		assertThat(listener.statesExited.size(), is(0));
+		assertThat(machine.getState().getIds()).containsExactly(States.LOCKED);
+		assertThat(listener.statesEntered).hasSize(1);
+		assertThat(listener.statesEntered.get(0).getId()).isEqualTo(States.LOCKED);
+		assertThat(listener.statesExited).isEmpty();
 	}
 
 	static class Config {
@@ -134,7 +134,7 @@ public class TurnstileTests {
 	}
 
 	@SuppressWarnings("unchecked")
-	@Before
+	@BeforeEach
 	public void setup() {
 		context = new AnnotationConfigApplicationContext();
 		context.register(CommonConfiguration.class, Application.class, Config.class, StateMachineCommands.class);
@@ -144,9 +144,9 @@ public class TurnstileTests {
 		commands = context.getBean(StateMachineCommands.class);
 	}
 
-	@After
+	@AfterEach
 	public void clean() {
-		machine.stop();
+		doStopAndAssert(machine);
 		context.close();
 		context = null;
 		machine = null;

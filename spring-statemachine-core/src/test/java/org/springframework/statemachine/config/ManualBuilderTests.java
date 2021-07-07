@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,17 @@
  */
 package org.springframework.statemachine.config;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.SmartLifecycle;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
-import org.springframework.statemachine.TestUtils;
 import org.springframework.statemachine.config.StateMachineBuilder.Builder;
 import org.springframework.statemachine.config.builders.StateMachineConfigBuilder;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -58,19 +53,17 @@ public class ManualBuilderTests {
 				new DefaultStateMachineModel<String, String>(stateMachineConfigurationConfig, stateMachineStates, stateMachineTransitions));
 
 		StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
-		beanFactory.addBean(StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME, new SyncTaskExecutor());
-		beanFactory.addBean("taskScheduler", new ConcurrentTaskScheduler());
 		stateMachineFactory.setBeanFactory(beanFactory);
 
 		TestListener listener = new TestListener();
 		StateMachine<String,String> stateMachine = stateMachineFactory.getStateMachine();
 		stateMachine.addStateListener(listener);
-		stateMachine.start();
+		doStartAndAssert(stateMachine);
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getState().getIds()).containsOnly("S1");
 	}
 
 	@Test
@@ -78,8 +71,6 @@ public class ManualBuilderTests {
 		Builder<String, String> builder = StateMachineBuilder.builder();
 
 		StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
-		beanFactory.addBean(StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME, new SyncTaskExecutor());
-		beanFactory.addBean("taskScheduler", new ConcurrentTaskScheduler());
 
 		builder.configureConfiguration()
 			.withConfiguration()
@@ -97,15 +88,15 @@ public class ManualBuilderTests {
 				.source("S2").target("S1").event("E2");
 
 		StateMachine<String, String> stateMachine = builder.build();
-		assertThat(stateMachine, notNullValue());
+		assertThat(stateMachine).isNotNull();
 		TestListener listener = new TestListener();
 		stateMachine.addStateListener(listener);
-		stateMachine.start();
+		doStartAndAssert(stateMachine);
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getState().getIds()).containsOnly("S1");
 	}
 
 	@Test
@@ -113,8 +104,6 @@ public class ManualBuilderTests {
 		Builder<MyStates, MyEvents> builder = StateMachineBuilder.builder();
 
 		StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
-		beanFactory.addBean(StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME, new SyncTaskExecutor());
-		beanFactory.addBean("taskScheduler", new ConcurrentTaskScheduler());
 
 		builder.configureConfiguration()
 			.withConfiguration()
@@ -132,83 +121,22 @@ public class ManualBuilderTests {
 				.source(MyStates.S2).target(MyStates.S1).event(MyEvents.E2);
 
 		StateMachine<MyStates, MyEvents> stateMachine = builder.build();
-		assertThat(stateMachine, notNullValue());
+		assertThat(stateMachine).isNotNull();
 		TestListener2 listener = new TestListener2();
 		stateMachine.addStateListener(listener);
-		stateMachine.start();
+		doStartAndAssert(stateMachine);
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(MyStates.S1));
-
-		listener.reset(1);
-		stateMachine.sendEvent(MyEvents.E1);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(MyStates.S2));
-	}
-
-	@Test
-	public void testManualBuildExplicitTaskExecutorAndScheduler() throws Exception {
-		Builder<String, String> builder = StateMachineBuilder.builder();
-
-		builder.configureConfiguration()
-			.withConfiguration()
-				.taskExecutor(new SyncTaskExecutor())
-				.taskScheduler(new ConcurrentTaskScheduler());
-
-		builder.configureStates()
-			.withStates()
-				.initial("S1").state("S2");
-
-		builder.configureTransitions()
-			.withExternal()
-				.source("S1").target("S2").event("E1")
-				.and()
-			.withExternal()
-				.source("S2").target("S1").event("E2");
-
-		StateMachine<String, String> stateMachine = builder.build();
-		assertThat(stateMachine, notNullValue());
-		TestListener listener = new TestListener();
-		stateMachine.addStateListener(listener);
-		stateMachine.start();
-
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getState().getIds()).containsOnly(MyStates.S1);
 
 		listener.reset(1);
-		stateMachine.sendEvent("E1");
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder("S2"));
-	}
-
-	@Test
-	public void testManualBuildDefaultTaskExecutor() throws Exception {
-		Builder<String, String> builder = StateMachineBuilder.builder();
-
-		builder.configureStates()
-			.withStates()
-				.initial("S1").state("S2");
-
-		builder.configureTransitions()
-			.withExternal()
-				.source("S1").target("S2").event("E1")
-				.and()
-			.withExternal()
-				.source("S2").target("S1").event("E2");
-
-		StateMachine<String, String> stateMachine = builder.build();
-		assertThat(stateMachine, notNullValue());
-
-		assertThat(TestUtils.readField("taskExecutor", stateMachine), notNullValue());
-		assertThat(TestUtils.readField("taskScheduler", stateMachine), notNullValue());
+		doSendEventAndConsumeAll(stateMachine, MyEvents.E1);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getState().getIds()).containsOnly(MyStates.S2);
 	}
 
 	@Test
@@ -217,9 +145,7 @@ public class ManualBuilderTests {
 
 		builder.configureConfiguration()
 			.withConfiguration()
-				.autoStartup(true)
-				.taskExecutor(new SyncTaskExecutor())
-				.taskScheduler(new ConcurrentTaskScheduler());
+				.autoStartup(true);
 
 		builder.configureStates()
 			.withStates()
@@ -234,8 +160,8 @@ public class ManualBuilderTests {
 
 		StateMachine<String, String> stateMachine = builder.build();
 
-		assertThat(((SmartLifecycle)stateMachine).isAutoStartup(), is(true));
-		assertThat(((SmartLifecycle)stateMachine).isRunning(), is(true));
+		assertThat(((SmartLifecycle)stateMachine).isAutoStartup()).isTrue();
+		assertThat(((SmartLifecycle)stateMachine).isRunning()).isTrue();
 	}
 
 	static enum MyStates {
@@ -277,12 +203,6 @@ public class ManualBuilderTests {
 			stateChangedCount++;
 			stateChangedLatch.countDown();
 		}
-
-		public void reset(int a1) {
-			stateChangedCount = 0;
-			stateChangedLatch = new CountDownLatch(a1);
-		}
-
 	}
 
 	private static class TestListener2 extends StateMachineListenerAdapter<MyStates, MyEvents> {

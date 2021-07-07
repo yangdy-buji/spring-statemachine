@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,9 @@
 package org.springframework.statemachine.ensemble;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,10 +28,9 @@ import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.StateMachineSystemConstants;
-import org.springframework.statemachine.access.StateMachineAccess;
 import org.springframework.statemachine.access.StateMachineAccessor;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
@@ -39,6 +40,9 @@ import org.springframework.statemachine.transition.Transition;
 import org.springframework.statemachine.transition.TransitionKind;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * {@code DistributedStateMachine} is wrapping a real {@link StateMachine} and works
@@ -77,41 +81,61 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 	@Override
 	protected void onInit() throws Exception {
 		// TODO: should we register with all, not just top one?
-		delegate.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<S, E>>() {
+		delegate.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<S, E> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
+	}
+
+	@Override
+	protected Mono<Void> doPreStartReactively() {
+		return Mono.defer(() -> {
+			ensemble.addEnsembleListener(listener);
+			ensemble.join(this);
+			return Mono.empty();
 		});
-
 	}
 
 	@Override
-	protected void doStart() {
-		ensemble.addEnsembleListener(listener);
-		ensemble.join(this);
-		super.doStart();
+	protected Mono<Void> doPreStopReactively() {
+		return Mono.defer(() -> {
+			ensemble.removeEnsembleListener(listener);
+			ensemble.leave(this);
+			return Mono.empty();
+		});
 	}
 
 	@Override
-	protected void doStop() {
-		ensemble.removeEnsembleListener(listener);
-		ensemble.leave(this);
-		super.doStop();
-	}
-
-	@Override
+	@SuppressWarnings({"all", "deprecation"})
 	public boolean sendEvent(Message<E> event) {
 		// adding state machine id to the message so that
 		// listeners can know from where a state change originates
-		return delegate.sendEvent(MessageBuilder.fromMessage(event)
-				.setHeader(StateMachineSystemConstants.STATEMACHINE_IDENTIFIER, delegate.getUuid()).build());
+		return delegate.sendEvent(addMachineIdentifier().apply(event));
 	}
 
 	@Override
+	@SuppressWarnings({"all", "deprecation"})
 	public boolean sendEvent(E event) {
 		return sendEvent(MessageBuilder.withPayload(event).build());
+	}
+
+	@Override
+	public Flux<StateMachineEventResult<S, E>> sendEvent(Mono<Message<E>> event) {
+		return delegate.sendEvent(event.map(addMachineIdentifier()));
+	}
+
+	@Override
+	public Mono<List<StateMachineEventResult<S, E>>> sendEventCollect(Mono<Message<E>> event) {
+		return delegate.sendEventCollect(event.map(addMachineIdentifier()));
+	}
+
+	@Override
+	public Flux<StateMachineEventResult<S, E>> sendEvents(Flux<Message<E>> events) {
+		return delegate.sendEvents(events.map(addMachineIdentifier()));
+	}
+
+	private Function<Message<E>, Message<E>> addMachineIdentifier() {
+		return e -> MessageBuilder.fromMessage(e)
+			.setHeader(StateMachineSystemConstants.STATEMACHINE_IDENTIFIER, delegate.getUuid())
+			.build();
 	}
 
 	@Override
@@ -198,7 +222,7 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 
 		@Override
 		public void preStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-				StateMachine<S, E> stateMachine) {
+				StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
 			if (log.isTraceEnabled()) {
 				log.trace("Received preStateChange from " + stateMachine + " for delegate " + delegate);
 			}
@@ -213,7 +237,7 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 
 		@Override
 		public void postStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-				StateMachine<S, E> stateMachine) {
+				StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
 		}
 
 		@Override
@@ -262,7 +286,7 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 				log.debug("Event stateMachineJoined stateMachine=[" + stateMachine + "] context=[" + context + "]");
 			}
 			if (stateMachine != null && stateMachine == DistributedStateMachine.this) {
-				delegate.stop();
+				delegate.stopReactively().block();
 				setStateMachineError(null);
 				if (context != null) {
 					// I'm now successfully joined, so set delegating
@@ -272,18 +296,11 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 						log.debug("Joining with context " + context);
 					}
 
-					delegate.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<S, E>>() {
-
-						@Override
-						public void apply(StateMachineAccess<S, E> function) {
-							function.resetStateMachine(context);
-						}
-
-					});
+					delegate.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(context));
 				}
 				log.info("Requesting to start delegating state machine " + delegate);
 				log.info("Delegating machine id " + delegate.getUuid());
-				delegate.start();
+				delegate.startReactively().block();
 			}
 		}
 
@@ -291,7 +308,7 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 		public void stateMachineLeft(StateMachine<S, E> stateMachine, StateMachineContext<S, E> context) {
 			if (stateMachine != null && stateMachine == DistributedStateMachine.this) {
 				log.info("Requesting to stop delegating state machine " + delegate);
-				delegate.stop();
+				delegate.stopReactively().block();
 			}
 		}
 
@@ -300,8 +317,10 @@ public class DistributedStateMachine<S, E> extends LifecycleObjectSupport implem
 			// do not pass if state change was originated from this dist machine
 			if (!ObjectUtils.nullSafeEquals(delegate.getUuid(),
 					context.getEventHeaders().get(StateMachineSystemConstants.STATEMACHINE_IDENTIFIER))) {
-				delegate.sendEvent(MessageBuilder.withPayload(context.getEvent())
-						.copyHeaders(context.getEventHeaders()).build());
+				Message<E> m = MessageBuilder.withPayload(context.getEvent())
+						.copyHeaders(context.getEventHeaders())
+						.build();
+				delegate.sendEvent(Mono.just(m)).subscribe();
 			}
 		}
 

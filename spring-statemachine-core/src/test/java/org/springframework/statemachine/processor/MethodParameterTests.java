@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,13 @@
  */
 package org.springframework.statemachine.processor;
 
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.lang.reflect.Method;
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
@@ -76,12 +75,12 @@ public class MethodParameterTests {
 		@OnTransition
 		public void onTransition(@EventHeaders Map<String, Object> headers, ExtendedState extendedState, StateMachine<?, ?> stateMachine,
 				Message<?> message, Exception e, StateContext<?, ?> stateContext) {
-			assertThat(headers, notNullValue());
-			assertThat(extendedState, notNullValue());
-			assertThat(stateMachine, notNullValue());
-			assertThat(message, notNullValue());
-			assertThat(e, notNullValue());
-			assertThat(stateContext, notNullValue());
+			assertThat(headers).isNotNull();
+			assertThat(extendedState).isNotNull();
+			assertThat(stateMachine).isNotNull();
+			assertThat(message).isNotNull();
+			assertThat(e).isNotNull();
+			assertThat(stateContext).isNotNull();
 		}
 
 	}

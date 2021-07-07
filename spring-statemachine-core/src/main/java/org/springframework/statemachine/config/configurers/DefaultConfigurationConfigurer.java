@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,15 +17,16 @@ package org.springframework.statemachine.config.configurers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.TaskScheduler;
+import org.springframework.statemachine.action.StateDoActionPolicy;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationBuilder;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.common.annotation.AnnotationConfigurerAdapter;
 import org.springframework.statemachine.config.model.ConfigurationData;
 import org.springframework.statemachine.listener.StateMachineListener;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.transition.TransitionConflictPolicy;
 
 /**
@@ -42,21 +43,22 @@ public class DefaultConfigurationConfigurer<S, E>
 
 	private String machineId;
 	private BeanFactory beanFactory;
-	private TaskExecutor taskExecutor;
-	private TaskScheduler taskScheculer;
 	private boolean autoStart = false;
 	private TransitionConflictPolicy transitionConflightPolicy;
+	private StateDoActionPolicy stateDoActionPolicy;
+	private Long stateDoActionPolicyTimeout;
+	private RegionExecutionPolicy regionExecutionPolicy;
 	private final List<StateMachineListener<S, E>> listeners = new ArrayList<StateMachineListener<S, E>>();
 
 	@Override
 	public void configure(StateMachineConfigurationBuilder<S, E> builder) throws Exception {
 		builder.setMachineId(machineId);
 		builder.setBeanFactory(beanFactory);
-		builder.setTaskExecutor(taskExecutor);
-		builder.setTaskScheculer(taskScheculer);
 		builder.setAutoStart(autoStart);
 		builder.setStateMachineListeners(listeners);
 		builder.setTransitionConflictPolicy(transitionConflightPolicy);
+		builder.setStateDoActionPolicy(stateDoActionPolicy, stateDoActionPolicyTimeout);
+		builder.setRegionExecutionPolicy(regionExecutionPolicy);
 	}
 
 	@Override
@@ -68,18 +70,6 @@ public class DefaultConfigurationConfigurer<S, E>
 	@Override
 	public ConfigurationConfigurer<S, E> beanFactory(BeanFactory beanFactory) {
 		this.beanFactory = beanFactory;
-		return this;
-	}
-
-	@Override
-	public ConfigurationConfigurer<S, E> taskExecutor(TaskExecutor taskExecutor) {
-		this.taskExecutor = taskExecutor;
-		return this;
-	}
-
-	@Override
-	public ConfigurationConfigurer<S, E> taskScheduler(TaskScheduler taskScheduler) {
-		this.taskScheculer = taskScheduler;
 		return this;
 	}
 
@@ -98,6 +88,24 @@ public class DefaultConfigurationConfigurer<S, E>
 	@Override
 	public ConfigurationConfigurer<S, E> transitionConflictPolicy(TransitionConflictPolicy transitionConflightPolicy) {
 		this.transitionConflightPolicy = transitionConflightPolicy;
+		return this;
+	}
+
+	@Override
+	public ConfigurationConfigurer<S, E> stateDoActionPolicy(StateDoActionPolicy stateDoActionPolicy) {
+		this.stateDoActionPolicy = stateDoActionPolicy;
+		return this;
+	}
+
+	@Override
+	public ConfigurationConfigurer<S, E> stateDoActionPolicyTimeout(long timeout, TimeUnit unit) {
+		this.stateDoActionPolicyTimeout = unit.toMillis(timeout);
+		return this;
+	}
+
+	@Override
+	public ConfigurationConfigurer<S, E> regionExecutionPolicy(RegionExecutionPolicy regionExecutionPolicy) {
+		this.regionExecutionPolicy = regionExecutionPolicy;
 		return this;
 	}
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,12 @@
  */
 package org.springframework.statemachine.event;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -54,7 +52,7 @@ public class ContextEventTests extends AbstractStateMachineTests {
 	@SuppressWarnings("unchecked")
 	@Test
 	public void contextEventsEnabled() throws Exception {
-		context.register(BaseConfig.class, Config.class, Config1.class);
+		context.register(Config.class, Config1.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -62,13 +60,13 @@ public class ContextEventTests extends AbstractStateMachineTests {
 		machine.sendEvent(TestEvents.E1);
 		StateMachineApplicationEventListener listener = context.getBean(StateMachineApplicationEventListener.class);
 		listener.latch.await(1, TimeUnit.SECONDS);
-		assertThat(listener.count, greaterThan(1));
+		assertThat(listener.count).isGreaterThan(1);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
 	public void contextEventsDisabled() throws Exception {
-		context.register(BaseConfig.class, Config.class, Config2.class);
+		context.register(Config.class, Config2.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -76,13 +74,13 @@ public class ContextEventTests extends AbstractStateMachineTests {
 		machine.sendEvent(TestEvents.E1);
 		StateMachineApplicationEventListener listener = context.getBean(StateMachineApplicationEventListener.class);
 		listener.latch.await(1, TimeUnit.SECONDS);
-		assertThat(listener.count, is(0));
+		assertThat(listener.count).isZero();
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
 	public void contextEventsWithManualBuilder() throws Exception {
-		context.register(BaseConfig.class, Config.class, Config3.class);
+		context.register(Config.class, Config3.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -90,13 +88,13 @@ public class ContextEventTests extends AbstractStateMachineTests {
 		machine.sendEvent(TestEvents.E1);
 		StateMachineApplicationEventListener listener = context.getBean(StateMachineApplicationEventListener.class);
 		listener.latch.await(1, TimeUnit.SECONDS);
-		assertThat(listener.count, greaterThan(1));
+		assertThat(listener.count).isGreaterThan(1);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
 	public void contextEventsWithManualBuilderExternalConfigClass() throws Exception {
-		context.register(BaseConfig.class, Config.class, ExternalConfig.class);
+		context.register(Config.class, ExternalConfig.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -106,7 +104,7 @@ public class ContextEventTests extends AbstractStateMachineTests {
 		listener.reset();
 		machine.sendEvent(TestEvents.E1);
 		listener.latch.await(1, TimeUnit.SECONDS);
-		assertThat(listener.count, greaterThan(1));
+		assertThat(listener.count).isGreaterThan(1);
 	}
 
 	@Configuration

@@ -1,8 +1,138 @@
 SPRING STATEMACHINE CHANGELOG
 =============================
-http://projects.spring.io/spring-statemachine/
+https://projects.spring.io/spring-statemachine/
 
 Issues: https://github.com/spring-projects/spring-statemachine/issues
+
+Changes in version 3.0.0 (2021-03-19)
+-------------------------------------
+* Update boot 2.4.4 [#933]
+* Docs refactoring for reactive changes [#742]
+
+Changes in version 3.0.0-RC2 (2021-03-14)
+-----------------------------------------
+* Update boot 2.4.3 [#928]
+* 3.0.0.RC1 sendEvent of Mono<Message> returns Flux<StateMachineResult> [#922]
+* resetStateMachine method of the StateMachineAccessor fails when using reactive model [#911]
+* Add reactive support [#397]
+
+Changes in version 3.0.0-RC1 (2020-12-11)
+-----------------------------------------
+* Support using junit5 [#771]
+* NullPointerException in PseudoStates without Transitions [#775]
+* Forwardport 2.1.x changes to master [#777]
+* Refactor tests to use junit5 [#779]
+* Overhaul spring-statemachine-test use for junit [#780]
+* Reactive error handling for actions [#821]
+* Jpa eclipselink compability [#833]
+* Fix typo in documentation [#835]
+* Update spring-doc-resources version and highlight [#838]
+* StateMachineBuilder.Builder return StateMachineFactory [#854]
+* Add generic, thread safe support to PersistStateMachineHandler [#856]
+* Attempt to fix flaky tests [#864]
+* Remove Function interface [#867]
+* minor syntax fix [#873]
+* 2.2.0 RELEASE doc has wrong word [#875]
+* 2.2.0 RELEASE doc has wrong word [#877]
+* Reactive PseudoStates [#878]
+* Disable security on a web sample [#880]
+* Remove StateMachineInterceptor deprecations [#907]
+
+Changes in version 3.0.0.M1 (2019-08-08)
+----------------------------------------
+* Initial reactive refactor [#740]
+* Add initial reactive Action support [#743]
+* Refactor test to use reactive methods [#744]
+* Deferred events not cleared in ReactiveStateMachineExecutor [#747]
+* Refactor internals to reactive methods [#750]
+* Generic Boot 2.2.x and Framework 5.2.x changes [#765]
+* Change StateMachineFunction to Consumer [#767]
+* Add junit 5 to build infra [#772]
+* Add initial reactive Guard support [#791]
+* Add reactive Trigger support [#799]
+* Remove TaskExecutor/TaskScheduler [#800]
+
+Changes in version 2.1.2.RELEASE (2019-04-29)
+---------------------------------------------
+* Polish docs [#687]
+* Editing pass [#719]
+* Modernized the document production [#720]
+* Add backwards compatibility between StateMachineContext serialization [#722]
+* AbstractStateMachinePersister incorrectly build StateMachineContext for nested region and Fork/Join SM [#723]
+* RegionPersistingInterceptorAdapter missing methods [#726]
+* Infinite loop when triggering initial event of a submachine [#729]
+* Post state change intercept may happen too early [#734]
+
+Changes in version 2.1.1.RELEASE (2019-03-19)
+---------------------------------------------
+* Fix wrong docs in Using StateMachineRuntimePersister [#595]
+* StateMachineInterceptor code is not executed [#633]
+* URL Cleanup [#635]
+* Add support for @EventHeader annotation [#638]
+* Add new method hasStateMachine [#640]
+* JoinPseudoState not tracking join states correctly [#684]
+
+Changes in version 2.1.0.RELEASE (2019-02-18)
+---------------------------------------------
+* Upgrade to boot 2.1.3 [#632]
+
+Changes in version 2.1.0.RC1 (2019-01-29)
+-----------------------------------------
+* Cannot define unnamed choice: "Initial state must be set" error bug [#591]
+* SM persistence and change of configuration [#605]
+* SOE with persistence and orthogonal states [#615]
+* Kryo seem to miss StateMachineContextSerializer at times bug [#617]
+* Multiple end states for Join/Fork bug [#619]
+* Document region changes docs [#621]
+* Re-enable devtools for samples enhancement [#623]
+* Upgrade to Kryo 4 [#625]
+* DefaultStateMachineContext does not override equals [#628]
+
+Changes in version 2.1.0.M1 (2018-11-28)
+----------------------------------------
+* Upgrade to Spring Boot 2.1.x [#602]
+
+Changes in version 2.0.3.RELEASE (2018-11-10)
+---------------------------------------------
+* Initial state wrongly entered with entry point [#577]
+* Update sm.adoc [#587]
+* Fixed Enum Comparison [#592]
+* Fix numpad typo in Reference documentation, section B.3.8 [#594]
+
+Changes in version 2.0.2.RELEASE (2018-07-12)
+---------------------------------------------
+* Update sm.adoc [#565]
+* StateMachineHandlerCallHelper uses BeanFactory#toString [#569]
+* Use Spring Boot autoconfigure-processor to optimize auto-configurations [#570]
+* UML Factory facilities leak memory [#572]
+* Upgrade to boot 2.0.3 [#576]
+
+Changes in version 2.0.1.RELEASE (2018-04-06)
+---------------------------------------------
+* mvn spring-boot:run fails when devtools are on the classpath [#531]
+* Add getters on some fields in TimeTrigger [#533]
+* State Machine Does Not Restore To State After Load From DB [#537]
+* Upgrade to boot 2.0.1 [#543]
+
+Changes in version 2.0.0.RELEASE (2018-03-06)
+---------------------------------------------
+* Executor should poll until the queue is empty [#520]
+* Backport 1.2.x changes for 2.0.0.RELEASE [#523]
+
+Changes in version 2.0.0.RC1 (2018-03-01)
+-----------------------------------------
+* RepositoryStateMachinePersist not using contextObj as id [#494]
+* Missing accessor for state actions [#502]
+* Rename spring-statemachine-boot to spring-statemachine-autoconfigure [#507]
+* Change jpapersist sample to support mongo and redis [#509]
+* Upgrade to boot 2.0.0.RELEASE [#518]
+
+Changes in version 2.0.0.M5 (2018-02-25)
+----------------------------------------
+* Docs and sample for bom/starter [#499]
+* Backport 1.2.x changes for 2.0.0.M5 [#504]
+* Upgrade to boot 2.0.0.RC2 [#513]
+* Remove spring-statemachine-redis [#514]
 
 Changes in version 2.0.0.M4 (2018-02-12)
 ----------------------------------------

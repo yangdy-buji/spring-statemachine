@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,14 @@
  */
 package org.springframework.statemachine.config.builders;
 
-import org.springframework.statemachine.action.Action;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.config.common.annotation.AbstractConfiguredAnnotationBuilder;
 import org.springframework.statemachine.config.common.annotation.AnnotationBuilder;
 import org.springframework.statemachine.config.common.annotation.ObjectPostProcessor;
@@ -47,15 +54,10 @@ import org.springframework.statemachine.config.model.HistoryData;
 import org.springframework.statemachine.config.model.JunctionData;
 import org.springframework.statemachine.config.model.TransitionData;
 import org.springframework.statemachine.config.model.TransitionsData;
-import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.transition.TransitionKind;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import reactor.core.publisher.Mono;
 
 /**
  * {@link AnnotationBuilder} for {@link TransitionsData}.
@@ -175,8 +177,9 @@ public class StateMachineTransitionBuilder<S, E>
 	 * @param kind the kind
 	 * @param securityRule the security rule
 	 */
-	public void addTransition(S source, S target, S state, E event, Long period, Integer count, Collection<Action<S, E>> actions,
-			Guard<S, E> guard, TransitionKind kind, SecurityRule securityRule) {
+	public void addTransition(S source, S target, S state, E event, Long period, Integer count,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> actions,
+			Function<StateContext<S, E>, Mono<Boolean>> guard, TransitionKind kind, SecurityRule securityRule) {
 		// if rule not given, get it from global
 		if (securityRule == null) {
 			@SuppressWarnings("unchecked")

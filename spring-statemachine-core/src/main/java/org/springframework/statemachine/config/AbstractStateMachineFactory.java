@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package org.springframework.statemachine.config;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -26,26 +27,26 @@ import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.context.SmartLifecycle;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.messaging.Message;
-import org.springframework.scheduling.TaskScheduler;
 import org.springframework.statemachine.ExtendedState;
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.action.Actions;
 import org.springframework.statemachine.config.model.ChoiceData;
 import org.springframework.statemachine.config.model.DefaultStateMachineModel;
 import org.springframework.statemachine.config.model.EntryData;
 import org.springframework.statemachine.config.model.ExitData;
 import org.springframework.statemachine.config.model.HistoryData;
 import org.springframework.statemachine.config.model.JunctionData;
+import org.springframework.statemachine.config.model.MalformedConfigurationException;
 import org.springframework.statemachine.config.model.StateData;
 import org.springframework.statemachine.config.model.StateMachineModel;
 import org.springframework.statemachine.config.model.StateMachineModelFactory;
@@ -80,6 +81,7 @@ import org.springframework.statemachine.state.StateMachineState;
 import org.springframework.statemachine.support.DefaultExtendedState;
 import org.springframework.statemachine.support.LifecycleObjectSupport;
 import org.springframework.statemachine.support.StateMachineInterceptor;
+import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.support.tree.Tree;
 import org.springframework.statemachine.support.tree.Tree.Node;
 import org.springframework.statemachine.support.tree.TreeTraverser;
@@ -93,6 +95,8 @@ import org.springframework.statemachine.trigger.EventTrigger;
 import org.springframework.statemachine.trigger.TimerTrigger;
 import org.springframework.statemachine.trigger.Trigger;
 import org.springframework.util.ObjectUtils;
+
+import reactor.core.publisher.Mono;
 
 /**
  * Base {@link StateMachineFactory} implementation building {@link StateMachine}s.
@@ -219,9 +223,14 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 
 			if (initialCount > 1) {
 				for (Collection<StateData<S, E>> regionStateDatas : regionsStateDatas) {
-					machine = buildMachine(machineMap, stateMap, holderList, regionStateDatas, transitionsData, resolveBeanFactory(stateMachineModel),
-							contextEvents, defaultExtendedState, stateMachineModel.getTransitionsData(), resolveTaskExecutor(stateMachineModel),
-							resolveTaskScheduler(stateMachineModel), machineId, null, stateMachineModel);
+					// try to build reqion id's
+					Object rId = regionStateDatas.iterator().next().getRegion();
+					String mId = machineId != null ? machineId : stateMachineModel.getConfigurationData().getMachineId();
+					mId = mId + "#" + (rId != null ? rId.toString() : "");
+
+					machine = buildMachine(machineMap, stateMap, holderList, regionStateDatas, transitionsData,
+							resolveBeanFactory(stateMachineModel), contextEvents, defaultExtendedState,
+							stateMachineModel.getTransitionsData(), mId, null, stateMachineModel);
 					regionStack.push(new MachineStackItem<S, E>(machine));
 					machines.add(machine);
 				}
@@ -232,8 +241,11 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 					regions.add(pop.machine);
 				}
 				S parent = (S)peek.getParent();
-				RegionState<S, E> rstate = buildRegionStateInternal(parent, regions, null, stateData != null ? stateData.getEntryActions() : null,
-						stateData != null ? stateData.getExitActions() : null, new DefaultPseudoState<S, E>(PseudoStateKind.INITIAL));
+				RegionState<S, E> rstate = buildRegionStateInternal(parent, regions, null,
+						stateData != null ? stateData.getEntryActions() : null,
+						stateData != null ? stateData.getExitActions() : null,
+						new DefaultPseudoState<S, E>(PseudoStateKind.INITIAL), stateMachineModel);
+				rstate.setRegionExecutionPolicy(stateMachineModel.getConfigurationData().getRegionExecutionPolicy());
 				if (stateData != null) {
 					stateMap.put(stateData.getState(), rstate);
 				} else {
@@ -242,17 +254,16 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 					states.add(rstate);
 					Transition<S, E> initialTransition = new InitialTransition<S, E>(rstate);
 					StateMachine<S, E> m = buildStateMachineInternal(states, new ArrayList<Transition<S, E>>(), rstate, initialTransition,
-							null, defaultExtendedState, null, contextEvents, resolveBeanFactory(stateMachineModel), resolveTaskExecutor(stateMachineModel),
-							resolveTaskScheduler(stateMachineModel), beanName,
+							null, defaultExtendedState, null, contextEvents, resolveBeanFactory(stateMachineModel), beanName,
 							machineId != null ? machineId : stateMachineModel.getConfigurationData().getMachineId(),
 							uuid, stateMachineModel);
 					machine = m;
 					machines.add(m);
 				}
 			} else {
-				machine = buildMachine(machineMap, stateMap, holderList, stateDatas, transitionsData, resolveBeanFactory(stateMachineModel), contextEvents,
-						defaultExtendedState, stateMachineModel.getTransitionsData(), resolveTaskExecutor(stateMachineModel), resolveTaskScheduler(stateMachineModel),
-						machineId, uuid, stateMachineModel);
+				machine = buildMachine(machineMap, stateMap, holderList, stateDatas, transitionsData,
+						resolveBeanFactory(stateMachineModel), contextEvents, defaultExtendedState,
+						stateMachineModel.getTransitionsData(), machineId, uuid, stateMachineModel);
 				machines.add(machine);
 				if (peek.isInitial() || (!peek.isInitial() && !machineMap.containsKey(peek.getParent()))) {
 					machineMap.put(peek.getParent(), machine);
@@ -269,27 +280,17 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 
 		// set top-level machine as relay
 		final StateMachine<S, E> fmachine = machine;
-		fmachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<S, E>>() {
-
-			@Override
-			public void apply(StateMachineAccess<S, E> function) {
-				function.setRelay(fmachine);
-			}
-		});
+		fmachine.getStateMachineAccessor().doWithAllRegions(function -> function.setRelay(fmachine));
 
 		// add monitoring hooks
 		final StateMachineMonitor<S, E> stateMachineMonitor = stateMachineModel.getConfigurationData().getStateMachineMonitor();
 		if (stateMachineMonitor != null || defaultStateMachineMonitor != null) {
-			fmachine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<S ,E>>() {
-
-				@Override
-				public void apply(StateMachineAccess<S, E> function) {
-					if (defaultStateMachineMonitor != null) {
-						function.addStateMachineMonitor(defaultStateMachineMonitor);
-					}
-					if (stateMachineMonitor != null) {
-						function.addStateMachineMonitor(stateMachineMonitor);
-					}
+			fmachine.getStateMachineAccessor().doWithRegion(function -> {
+				if (defaultStateMachineMonitor != null) {
+					function.addStateMachineMonitor(defaultStateMachineMonitor);
+				}
+				if (stateMachineMonitor != null) {
+					function.addStateMachineMonitor(stateMachineMonitor);
 				}
 			});
 		}
@@ -308,13 +309,7 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				m = machineMap.get(sParent);
 			}
 			final StateMachine<S, E> mm = m;
-			mme.getValue().getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<S ,E>>(){
-
-				@Override
-				public void apply(StateMachineAccess<S, E> function) {
-					function.setParentMachine(mm);
-				}
-			});
+			mme.getValue().getStateMachineAccessor().doWithRegion(function -> function.setParentMachine(mm));
 		}
 
 		// init built machines
@@ -330,13 +325,8 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 					stateMachineModel.getConfigurationData().getEventSecurityAccessDecisionManager(),
 					stateMachineModel.getConfigurationData().getEventSecurityRule());
 			log.info("Adding security interceptor " + securityInterceptor);
-			fmachine.getStateMachineAccessor().doWithAllRegions(new StateMachineFunction<StateMachineAccess<S, E>>() {
-
-				@Override
-				public void apply(StateMachineAccess<S, E> function) {
-					function.addStateMachineInterceptor(securityInterceptor);
-				}
-			});
+			fmachine.getStateMachineAccessor()
+					.doWithAllRegions(function -> function.addStateMachineInterceptor(securityInterceptor));
 		}
 
 		// setup distributed state machine if needed.
@@ -356,13 +346,11 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 
 		List<StateMachineInterceptor<S,E>> interceptors = stateMachineModel.getConfigurationData().getStateMachineInterceptors();
 		if (interceptors != null) {
+
 			for (final StateMachineInterceptor<S, E> interceptor : interceptors) {
-				machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<S,E>>() {
-					@Override
-					public void apply(StateMachineAccess<S, E> function) {
-						function.addStateMachineInterceptor(interceptor);
-					}
-				});
+				// add persisting interceptor hooks to all regions
+				RegionPersistingInterceptorAdapter<S, E> adapter = new RegionPersistingInterceptorAdapter<>(interceptor);
+				machine.getStateMachineAccessor().doWithAllRegions(function -> function.addStateMachineInterceptor(adapter));
 			}
 		}
 
@@ -373,6 +361,48 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 		}
 
 		return delegateAutoStartup(machine);
+	}
+
+	private static class RegionPersistingInterceptorAdapter<S, E> extends StateMachineInterceptorAdapter<S, E> {
+
+		private final StateMachineInterceptor<S, E> interceptor;
+
+		public RegionPersistingInterceptorAdapter(StateMachineInterceptor<S, E> interceptor) {
+			this.interceptor = interceptor;
+		}
+
+        @Override
+        public Message<E> preEvent(Message<E> message, StateMachine<S, E> stateMachine) {
+            return interceptor.preEvent(message, stateMachine);
+        }
+
+        @Override
+        public StateContext<S, E> preTransition(StateContext<S, E> stateContext) {
+            return interceptor.preTransition(stateContext);
+        }
+
+        @Override
+        public StateContext<S, E> postTransition(StateContext<S, E> stateContext) {
+            return interceptor.postTransition(stateContext);
+        }
+
+        @Override
+        public Exception stateMachineError(StateMachine<S, E> stateMachine, Exception exception) {
+            return interceptor.stateMachineError(stateMachine, exception);
+        }
+
+		@Override
+		public void preStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
+				StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
+			interceptor.preStateChange(state, message, transition, stateMachine, rootStateMachine);
+		}
+
+		@Override
+		public void postStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
+				StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine) {
+			interceptor.postStateChange(state, message, transition, stateMachine, rootStateMachine);
+		}
+
 	}
 
 	/**
@@ -424,22 +454,6 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			return stateMachineModel.getConfigurationData().getBeanFactory();
 		} else {
 			return getBeanFactory();
-		}
-	}
-
-	protected TaskExecutor resolveTaskExecutor(StateMachineModel<S, E> stateMachineModel) {
-		if (stateMachineModel.getConfigurationData().getTaskExecutor() != null) {
-			return stateMachineModel.getConfigurationData().getTaskExecutor();
-		} else {
-			return getTaskExecutor();
-		}
-	}
-
-	protected TaskScheduler resolveTaskScheduler(StateMachineModel<S, E> stateMachineModel) {
-		if (stateMachineModel.getConfigurationData().getTaskScheduler() != null) {
-			return stateMachineModel.getConfigurationData().getTaskScheduler();
-		} else {
-			return getTaskScheduler();
 		}
 	}
 
@@ -544,9 +558,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 
 	@SuppressWarnings("unchecked")
 	private StateMachine<S, E> buildMachine(Map<Object, StateMachine<S, E>> machineMap, Map<S, State<S, E>> stateMap,
-			List<HolderListItem<S, E>> holderList, Collection<StateData<S, E>> stateDatas, Collection<TransitionData<S, E>> transitionsData,
-			BeanFactory beanFactory, Boolean contextEvents, DefaultExtendedState defaultExtendedState,
-			TransitionsData<S, E> stateMachineTransitions, TaskExecutor taskExecutor, TaskScheduler taskScheduler, String machineId,
+			List<HolderListItem<S, E>> holderList, Collection<StateData<S, E>> stateDatas,
+			Collection<TransitionData<S, E>> transitionsData, BeanFactory beanFactory, Boolean contextEvents,
+			DefaultExtendedState defaultExtendedState, TransitionsData<S, E> stateMachineTransitions, String machineId,
 			UUID uuid, StateMachineModel<S, E> stateMachineModel) {
 		State<S, E> state = null;
 		State<S, E> initialState = null;
@@ -580,8 +594,15 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				if (stateData.isInitial()) {
 					pseudoState = new DefaultPseudoState<S, E>(PseudoStateKind.INITIAL);
 				}
-				state = new StateMachineState<S, E>(stateData.getState(), stateMachine, stateData.getDeferred(),
-						stateData.getEntryActions(), stateData.getExitActions(), pseudoState);
+				StateMachineState<S, E> stateMachineState = new StateMachineState<S, E>(stateData.getState(),
+						stateMachine, stateData.getDeferred(), stateData.getEntryActions(), stateData.getExitActions(),
+						pseudoState);
+				stateMachineState
+						.setStateDoActionPolicy(stateMachineModel.getConfigurationData().getStateDoActionPolicy());
+				stateMachineState.setStateDoActionPolicyTimeout(
+						stateMachineModel.getConfigurationData().getStateDoActionPolicyTimeout());
+				state = stateMachineState;
+
 				// TODO: below if/else doesn't feel right
 				if (stateDatas.size() > 1 && stateData.isInitial()) {
 					initialState = state;
@@ -631,6 +652,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				State<S, E> defaultState = null;
 				S s = stateData.getState();
 				Collection<HistoryData<S,E>> historys = stateMachineTransitions.getHistorys();
+				if (historys == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (HistoryData<S,E> history : historys) {
 					if (history.getSource().equals(s)) {
 						defaultState = stateMap.get(history.getTarget());
@@ -651,6 +675,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				State<S, E> defaultState = null;
 				S s = stateData.getState();
 				Collection<HistoryData<S,E>> historys = stateMachineTransitions.getHistorys();
+				if (historys == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (HistoryData<S,E> history : historys) {
 					if (history.getSource().equals(s)) {
 						defaultState = stateMap.get(history.getTarget());
@@ -672,13 +699,16 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			if (stateData.getPseudoStateKind() == PseudoStateKind.CHOICE) {
 				S s = stateData.getState();
 				List<ChoiceData<S, E>> list = stateMachineTransitions.getChoices().get(s);
+				if (list == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				List<ChoiceStateData<S, E>> choices = new ArrayList<ChoiceStateData<S, E>>();
 				for (ChoiceData<S, E> c : list) {
 					StateHolder<S, E> holder = new StateHolder<S, E>(stateMap.get(c.getTarget()));
 					if (holder.getState() == null) {
 						holderList.add(new HolderListItem<S, E>(c.getTarget(), holder));
 					}
-					choices.add(new ChoiceStateData<S, E>(holder, c.getGuard(), c.getActions()));
+					choices.add(new ChoiceStateData<S, E>(holder, c.getGuard(), Actions.from(c.getActions())));
 				}
 				PseudoState<S, E> pseudoState = new ChoicePseudoState<S, E>(choices);
 				state = buildStateInternal(stateData.getState(), stateData.getDeferred(), stateData.getEntryActions(),
@@ -689,12 +719,15 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				S s = stateData.getState();
 				List<JunctionData<S, E>> list = stateMachineTransitions.getJunctions().get(s);
 				List<JunctionStateData<S, E>> junctions = new ArrayList<JunctionStateData<S, E>>();
+				if (list == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (JunctionData<S, E> c : list) {
 					StateHolder<S, E> holder = new StateHolder<S, E>(stateMap.get(c.getTarget()));
 					if (holder.getState() == null) {
 						holderList.add(new HolderListItem<S, E>(c.getTarget(), holder));
 					}
-					junctions.add(new JunctionStateData<S, E>(holder, c.getGuard(), c.getActions()));
+					junctions.add(new JunctionStateData<S, E>(holder, c.getGuard(), Actions.from(c.getActions())));
 				}
 				PseudoState<S, E> pseudoState = new JunctionPseudoState<S, E>(junctions);
 				state = buildStateInternal(stateData.getState(), stateData.getDeferred(), stateData.getEntryActions(),
@@ -704,6 +737,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			} else if (stateData.getPseudoStateKind() == PseudoStateKind.ENTRY) {
 				S s = stateData.getState();
 				Collection<EntryData<S, E>> entrys = stateMachineTransitions.getEntrys();
+				if (entrys == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (EntryData<S, E> entry : entrys) {
 					if (s.equals(entry.getSource())) {
 						PseudoState<S, E> pseudoState = new EntryPseudoState<S, E>(stateMap.get(entry.getTarget()));
@@ -717,6 +753,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			} else if (stateData.getPseudoStateKind() == PseudoStateKind.EXIT) {
 				S s = stateData.getState();
 				Collection<ExitData<S, E>> exits = stateMachineTransitions.getExits();
+				if (exits == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (ExitData<S, E> entry : exits) {
 					if (s.equals(entry.getSource())) {
 						StateHolder<S, E> holder = new StateHolder<S, E>(stateMap.get(entry.getTarget()));
@@ -735,6 +774,9 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				S s = stateData.getState();
 				List<S> list = stateMachineTransitions.getForks().get(s);
 				List<State<S, E>> forks = new ArrayList<State<S,E>>();
+				if (list == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
 				for (S fs : list) {
 					forks.add(stateMap.get(fs));
 				}
@@ -746,27 +788,32 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			} else if (stateData.getPseudoStateKind() == PseudoStateKind.JOIN) {
 				S s = stateData.getState();
 				List<S> list = stateMachineTransitions.getJoins().get(s);
-				List<State<S, E>> joins = new ArrayList<State<S,E>>();
+				if (list == null) {
+					throw new MalformedConfigurationException("No transitions for state " + s);
+				}
+				List<List<State<S, E>>> joins = new ArrayList<List<State<S, E>>>();
 
-				// if join source is a regionstate, get
-				// it's end states from regions
+				// if join source is an orthogonal state, assume we're joining by region end states
+				// and actually use list of states from each region to support case where one region
+				// defines multiple end states.
 				if (list.size() == 1) {
 					State<S, E> ss1 = stateMap.get(list.get(0));
 					if (ss1 instanceof RegionState) {
 						Collection<Region<S, E>> regions = ((RegionState<S, E>)ss1).getRegions();
 						for (Region<S, E> r : regions) {
+							List<State<S, E>> j = new ArrayList<State<S, E>>();
 							Collection<State<S, E>> ss2 = r.getStates();
 							for (State<S, E> ss3 : ss2) {
 								if (ss3.getPseudoState() != null && ss3.getPseudoState().getKind() == PseudoStateKind.END) {
-									joins.add(ss3);
-									continue;
+									j.add(ss3);
 								}
 							}
+							joins.add(j);
 						}
 					}
 				} else {
 					for (S fs : list) {
-						joins.add(stateMap.get(fs));
+						joins.add(Collections.singletonList(stateMap.get(fs)));
 					}
 				}
 
@@ -805,12 +852,6 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 				TimerTrigger<S, E> t = new TimerTrigger<S, E>(period, count != null ? count : 0);
 				if (beanFactory != null) {
 					t.setBeanFactory(beanFactory);
-				}
-				if (taskExecutor != null) {
-					t.setTaskExecutor(taskExecutor);
-				}
-				if (taskScheduler != null) {
-					t.setTaskScheduler(taskScheduler);
 				}
 				trigger = t;
 				((AbstractState<S, E>)stateMap.get(source)).getTriggers().add(trigger);
@@ -860,22 +901,24 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 			}
 		}
 
-		Transition<S, E> initialTransition = new InitialTransition<S, E>(initialState, initialAction);
+		Transition<S, E> initialTransition = new InitialTransition<S, E>(initialState, Actions.from(initialAction));
 		StateMachine<S, E> machine = buildStateMachineInternal(states, transitions, initialState, initialTransition,
-				null, defaultExtendedState, historyState, contextEvents, beanFactory, taskExecutor, taskScheduler,
+				null, defaultExtendedState, historyState, contextEvents, beanFactory,
 				beanName, machineId != null ? machineId : stateMachineModel.getConfigurationData().getMachineId(), uuid, stateMachineModel);
 		return machine;
 	}
 
 	protected abstract StateMachine<S, E> buildStateMachineInternal(Collection<State<S, E>> states,
-			Collection<Transition<S, E>> transitions, State<S, E> initialState, Transition<S, E> initialTransition, Message<E> initialEvent,
-			ExtendedState extendedState, PseudoState<S, E> historyState, Boolean contextEventsEnabled, BeanFactory beanFactory,
-			TaskExecutor taskExecutor, TaskScheduler taskScheduler, String beanName, String machineId, UUID uuid,
+			Collection<Transition<S, E>> transitions, State<S, E> initialState, Transition<S, E> initialTransition,
+			Message<E> initialEvent, ExtendedState extendedState, PseudoState<S, E> historyState,
+			Boolean contextEventsEnabled, BeanFactory beanFactory, String beanName, String machineId, UUID uuid,
 			StateMachineModel<S, E> stateMachineModel);
 
 	protected abstract State<S, E> buildStateInternal(S id, Collection<E> deferred,
-			Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions,
-			Collection<? extends Action<S, E>> stateActions, PseudoState<S, E> pseudoState, StateMachineModel<S, E> stateMachineModel);
+			Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> stateActions, PseudoState<S, E> pseudoState,
+			StateMachineModel<S, E> stateMachineModel);
 
 	private Iterator<Node<StateData<S, E>>> buildStateDataIterator(StateMachineModel<S, E> stateMachineModel) {
 		Tree<StateData<S, E>> tree = new Tree<StateData<S, E>>();
@@ -899,9 +942,10 @@ public abstract class AbstractStateMachineFactory<S, E> extends LifecycleObjectS
 		}
 	}
 
-	protected abstract RegionState<S, E> buildRegionStateInternal(S id, Collection<Region<S, E>> regions, Collection<E> deferred,
-			Collection<? extends Action<S, E>> entryActions, Collection<? extends Action<S, E>> exitActions,
-			PseudoState<S, E> pseudoState);
+	protected abstract RegionState<S, E> buildRegionStateInternal(S id, Collection<Region<S, E>> regions,
+			Collection<E> deferred, Collection<Function<StateContext<S, E>, Mono<Void>>> entryActions,
+			Collection<Function<StateContext<S, E>, Mono<Void>>> exitActions, PseudoState<S, E> pseudoState,
+			StateMachineModel<S, E> stateMachineModel);
 
 	/**
 	 * Simple utility listener waiting machine to get started if

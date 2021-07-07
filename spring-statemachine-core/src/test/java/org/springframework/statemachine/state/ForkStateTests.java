@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,12 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,7 +44,7 @@ public class ForkStateTests extends AbstractStateMachineTests {
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testForkEventPassed() throws Exception {
-		context.register(BaseConfig.class, Config1.class);
+		context.register(Config1.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -59,28 +55,28 @@ public class ForkStateTests extends AbstractStateMachineTests {
 		TestEntryAction s21EntryAction = context.getBean("s21EntryAction", TestEntryAction.class);
 		TestEntryAction s30EntryAction = context.getBean("s30EntryAction", TestEntryAction.class);
 		TestEntryAction s31EntryAction = context.getBean("s31EntryAction", TestEntryAction.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 
 		listener.reset(2);
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).setHeader("foo", "bar").build());
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(2));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
 
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S31));
-		assertThat(s20EntryAction.stateContexts.size(), is(0));
-		assertThat(s21EntryAction.stateContexts.size(), is(1));
-		assertThat(s30EntryAction.stateContexts.size(), is(0));
-		assertThat(s31EntryAction.stateContexts.size(), is(1));
-		assertThat((String)s21EntryAction.stateContexts.get(0).getMessageHeader("foo"), is("bar"));
-		assertThat((String)s31EntryAction.stateContexts.get(0).getMessageHeader("foo"), is("bar"));
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S31);
+		assertThat(s20EntryAction.stateContexts).isEmpty();
+		assertThat(s21EntryAction.stateContexts).hasSize(1);
+		assertThat(s30EntryAction.stateContexts).isEmpty();
+		assertThat(s31EntryAction.stateContexts).hasSize(1);
+		assertThat((String)s21EntryAction.stateContexts.get(0).getMessageHeader("foo")).isEqualTo("bar");
+		assertThat((String)s31EntryAction.stateContexts.get(0).getMessageHeader("foo")).isEqualTo("bar");
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testForkToSuperEventNotPassed() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -91,28 +87,28 @@ public class ForkStateTests extends AbstractStateMachineTests {
 		TestEntryAction s21EntryAction = context.getBean("s21EntryAction", TestEntryAction.class);
 		TestEntryAction s30EntryAction = context.getBean("s30EntryAction", TestEntryAction.class);
 		TestEntryAction s31EntryAction = context.getBean("s31EntryAction", TestEntryAction.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 
 		listener.reset(3);
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).setHeader("foo", "bar").build());
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20, TestStates.S30));
-		assertThat(s20EntryAction.stateContexts.size(), is(1));
-		assertThat(s21EntryAction.stateContexts.size(), is(0));
-		assertThat(s30EntryAction.stateContexts.size(), is(1));
-		assertThat(s31EntryAction.stateContexts.size(), is(0));
-		assertThat((String)s20EntryAction.stateContexts.get(0).getMessageHeader("foo"), nullValue());
-		assertThat((String)s30EntryAction.stateContexts.get(0).getMessageHeader("foo"), nullValue());
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20, TestStates.S30);
+		assertThat(s20EntryAction.stateContexts).hasSize(1);
+		assertThat(s21EntryAction.stateContexts).isEmpty();
+		assertThat(s30EntryAction.stateContexts).hasSize(1);
+		assertThat(s31EntryAction.stateContexts).isEmpty();
+		assertThat((String)s20EntryAction.stateContexts.get(0).getMessageHeader("foo")).isNull();
+		assertThat((String)s30EntryAction.stateContexts.get(0).getMessageHeader("foo")).isNull();
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	public void testForkToSuperAndSubEventPassed() throws Exception {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
@@ -123,22 +119,22 @@ public class ForkStateTests extends AbstractStateMachineTests {
 		TestEntryAction s21EntryAction = context.getBean("s21EntryAction", TestEntryAction.class);
 		TestEntryAction s30EntryAction = context.getBean("s30EntryAction", TestEntryAction.class);
 		TestEntryAction s31EntryAction = context.getBean("s31EntryAction", TestEntryAction.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		machine.start();
 
 		listener.reset(2);
 		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).setHeader("foo", "bar").build());
 
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(2));
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
 
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20, TestStates.S31));
-		assertThat(s20EntryAction.stateContexts.size(), is(1));
-		assertThat(s21EntryAction.stateContexts.size(), is(0));
-		assertThat(s30EntryAction.stateContexts.size(), is(0));
-		assertThat(s31EntryAction.stateContexts.size(), is(1));
-		assertThat((String)s20EntryAction.stateContexts.get(0).getMessageHeader("foo"), nullValue());
-		assertThat((String)s31EntryAction.stateContexts.get(0).getMessageHeader("foo"), is("bar"));
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20, TestStates.S31);
+		assertThat(s20EntryAction.stateContexts).hasSize(1);
+		assertThat(s21EntryAction.stateContexts).isEmpty();
+		assertThat(s30EntryAction.stateContexts).isEmpty();
+		assertThat(s31EntryAction.stateContexts).hasSize(1);
+		assertThat((String)s20EntryAction.stateContexts.get(0).getMessageHeader("foo")).isNull();
+		assertThat((String)s31EntryAction.stateContexts.get(0).getMessageHeader("foo")).isEqualTo("bar");
 	}
 
 	@Configuration

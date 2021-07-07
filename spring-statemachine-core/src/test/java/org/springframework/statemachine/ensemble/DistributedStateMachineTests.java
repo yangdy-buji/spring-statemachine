@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,9 @@
  */
 package org.springframework.statemachine.ensemble;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
@@ -60,12 +59,12 @@ public class DistributedStateMachineTests extends AbstractStateMachineTests {
 		machine2s.start();
 
 		machine1s.sendEvent("E1");
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S1"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(machine1.getState().getIds()).containsOnly("S1");
+		assertThat(machine2.getState().getIds()).containsOnly("S1");
 
 		machine2s.sendEvent("E2");
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S2"));
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S2"));
+		assertThat(machine1.getState().getIds()).containsOnly("S2");
+		assertThat(machine2.getState().getIds()).containsOnly("S2");
 	}
 
 	@Test
@@ -86,14 +85,14 @@ public class DistributedStateMachineTests extends AbstractStateMachineTests {
 		machine1s.start();
 
 		machine1s.sendEvent("E1");
-		assertThat(machine1.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(machine1.getState().getIds()).containsOnly("S1");
 
 		DistributedStateMachine<String, String> machine2s =
 				new DistributedStateMachine<String, String>(ensemble, machine2);
 		machine2s.afterPropertiesSet();
 		machine2s.start();
 
-		assertThat(machine2.getState().getIds(), containsInAnyOrder("S1"));
+		assertThat(machine2.getState().getIds()).containsOnly("S1");
 	}
 
 	@Configuration

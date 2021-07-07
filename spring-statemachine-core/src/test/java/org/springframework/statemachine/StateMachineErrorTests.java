@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,23 +15,21 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 import org.springframework.statemachine.event.OnStateMachineError;
@@ -41,6 +39,9 @@ import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
+
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 /**
  * Tests for various errors and error handling.
@@ -67,7 +68,7 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 
-		assertThat(machine.hasStateMachineError(), is(false));
+		assertThat(machine.hasStateMachineError()).isFalse();
 
 		TestStateMachineListener listener2 = new TestStateMachineListener();
 		machine.addStateListener(listener2);
@@ -75,13 +76,13 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		machine.start();
 		machine.setStateMachineError(new RuntimeException("myerror"));
 
-		assertThat(listener1.latch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.count, is(1));
-		assertThat(listener3.latch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener3.count, is(1));
-		assertThat(listener2.latch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.count, is(1));
-		assertThat(machine.hasStateMachineError(), is(true));
+		assertThat(listener1.latch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.count).isEqualTo(1);
+		assertThat(listener3.latch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener3.count).isEqualTo(1);
+		assertThat(listener2.latch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.count).isEqualTo(1);
+		assertThat(machine.hasStateMachineError()).isTrue();
 	}
 
 	@Test
@@ -95,21 +96,16 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 
-		assertThat(machine.hasStateMachineError(), is(false));
+		assertThat(machine.hasStateMachineError()).isFalse();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<TestStates,TestEvents>>() {
-
-			@Override
-			public void apply(StateMachineAccess<TestStates, TestEvents> function) {
-				function.addStateMachineInterceptor(new StateMachineInterceptorAdapter<TestStates,TestEvents>() {
+		machine.getStateMachineAccessor().doWithRegion(
+				function -> function.addStateMachineInterceptor(new StateMachineInterceptorAdapter<TestStates,TestEvents>() {
 					@Override
 					public Exception stateMachineError(StateMachine<TestStates, TestEvents> stateMachine,
-							Exception exception) {
+													   Exception exception) {
 						return null;
 					}
-				});
-			}
-		});
+				}));
 
 		TestStateMachineListener listener2 = new TestStateMachineListener();
 		machine.addStateListener(listener2);
@@ -117,11 +113,11 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		machine.start();
 		machine.setStateMachineError(new RuntimeException("myerror"));
 
-		assertThat(listener1.latch.await(1, TimeUnit.SECONDS), is(false));
-		assertThat(listener1.count, is(0));
-		assertThat(listener2.latch.await(1, TimeUnit.SECONDS), is(false));
-		assertThat(listener2.count, is(0));
-		assertThat(machine.hasStateMachineError(), is(false));
+		assertThat(listener1.latch.await(1, TimeUnit.SECONDS)).isFalse();
+		assertThat(listener1.count).isEqualTo(0);
+		assertThat(listener2.latch.await(1, TimeUnit.SECONDS)).isFalse();
+		assertThat(listener2.count).isEqualTo(0);
+		assertThat(machine.hasStateMachineError()).isFalse();
 	}
 
 	@Test
@@ -133,13 +129,13 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 
-		assertThat(machine.hasStateMachineError(), is(false));
+		assertThat(machine.hasStateMachineError()).isFalse();
 		machine.start();
 		machine.setStateMachineError(new RuntimeException("myerror"));
-		assertThat(machine.hasStateMachineError(), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
+		assertThat(machine.hasStateMachineError()).isTrue();
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder(TestStates.S1);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder(TestStates.S1);
 	}
 
 	@Test
@@ -157,11 +153,11 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		machine.addStateListener(listener2);
 
 		machine.start();
-		assertThat(listener1.latch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.latch.await(2, TimeUnit.SECONDS)).isTrue();
 		machine.addStateListener(listener3);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(listener3.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
+		assertThat(listener3.latch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder(TestStates.S2);
 	}
 
 	@Test
@@ -179,11 +175,11 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		machine.addStateListener(listener2);
 
 		machine.start();
-		assertThat(listener1.latch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.latch.await(2, TimeUnit.SECONDS)).isTrue();
 		machine.addStateListener(listener3);
 		machine.sendEvent(TestEvents.E1);
-		assertThat(listener3.latch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2));
+		assertThat(listener3.latch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder(TestStates.S2);
 	}
 
 	@Configuration
@@ -193,7 +189,7 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		@Override
 		public void configure(StateMachineStateConfigurer<TestStates, TestEvents> states) throws Exception {
 			states
-				.withStates()
+					.withStates()
 					.initial(TestStates.S1)
 					.state(TestStates.S2)
 					.state(TestStates.S3)
@@ -203,22 +199,22 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		@Override
 		public void configure(StateMachineTransitionConfigurer<TestStates, TestEvents> transitions) throws Exception {
 			transitions
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S1)
 					.target(TestStates.S2)
 					.event(TestEvents.E1)
 					.and()
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S2)
 					.target(TestStates.S3)
 					.event(TestEvents.E2)
 					.and()
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S3)
 					.target(TestStates.S4)
 					.event(TestEvents.E3)
 					.and()
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S4)
 					.target(TestStates.S3)
 					.event(TestEvents.E4);
@@ -233,7 +229,7 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		@Override
 		public void configure(StateMachineStateConfigurer<TestStates, TestEvents> states) throws Exception {
 			states
-				.withStates()
+					.withStates()
 					.initial(TestStates.S1)
 					.state(TestStates.S2)
 					.state(TestStates.S3);
@@ -242,12 +238,12 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		@Override
 		public void configure(StateMachineTransitionConfigurer<TestStates, TestEvents> transitions) throws Exception {
 			transitions
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S1)
 					.target(TestStates.S2)
 					.event(TestEvents.E1)
 					.and()
-				.withExternal()
+					.withExternal()
 					.source(TestStates.S2)
 					.target(TestStates.S3)
 					.event(TestEvents.E2);
@@ -476,4 +472,89 @@ public class StateMachineErrorTests extends AbstractStateMachineTests {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testActionEntryError() throws Exception {
+		context.register(Config3.class);
+		context.refresh();
+
+		ObjectStateMachine<String, String> machine =
+			context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
+		machine.start();
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder("S2");
+	}
+
+	@Configuration
+	@EnableStateMachine
+	static class Config3 extends StateMachineConfigurerAdapter<String, String> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("SI")
+					.state("S1")
+					.stateEntry("S2", (context) -> {
+						throw new RuntimeException("error");
+					});
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("SI")
+					.target("S1")
+					.and()
+				.withExternal()
+					.source("S1")
+					.target("S2");
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testActionEntryErrorWithEvent() throws Exception {
+		context.register(Config4.class);
+		context.refresh();
+
+		ObjectStateMachine<String, String> machine =
+			context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
+		machine.start();
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder("SI");
+
+		StepVerifier.create(machine.sendEvent(Mono.just(MessageBuilder.withPayload("E1").build())))
+			.consumeNextWith(result -> {
+				StepVerifier.create(result.complete()).consumeErrorWith(e -> {
+					assertThat(e).isInstanceOf(StateMachineException.class).hasMessageContaining("Execution error");
+				}).verify();
+			})
+			.verifyComplete();
+
+		assertThat(machine.getState().getIds()).containsExactlyInAnyOrder("S1");
+	}
+
+	@Configuration
+	@EnableStateMachine
+	static class Config4 extends StateMachineConfigurerAdapter<String, String> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("SI")
+					.stateEntry("S1", (context) -> {
+						throw new RuntimeException("error");
+					});
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("SI")
+					.target("S1")
+					.event("E1");
+		}
+	}
 }

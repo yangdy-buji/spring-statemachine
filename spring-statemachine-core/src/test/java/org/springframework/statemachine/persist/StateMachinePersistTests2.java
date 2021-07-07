@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,14 @@
  */
 package org.springframework.statemachine.persist;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
@@ -66,7 +65,6 @@ public class StateMachinePersistTests2 extends AbstractStateMachineTests {
 		return new AnnotationConfigApplicationContext();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testVariousPersistOperations() throws Exception {
 		context.register(Config1.class);
@@ -75,70 +73,70 @@ public class StateMachinePersistTests2 extends AbstractStateMachineTests {
 		StateMachinePersister<String, String, String> persister = new DefaultStateMachinePersister<String, String, String>(
 				stateMachinePersist);
 
-		StateMachineFactory<String, String> factory = context.getBean("LOG_RECORD", StateMachineFactory.class);
+		StateMachineFactory<String, String> factory = resolveFactory("LOG_RECORD", context);
 		StateMachine<String,String> m = factory.getStateMachine();
 
-		assertThat(m.getState().getId(), equalTo(RECORD_AWAITING_CONTENT));
+		assertThat(m.getState().getId()).isEqualTo(RECORD_AWAITING_CONTENT);
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(UPLOAD_RECORD), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[] { RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING }));
-		persister.persist(m, "xxx");
-
-		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING}));
-		persister.persist(m, "xxx");
-
-		assertThat(m.sendEvent(SUSPEND_RECORD_LOGGING), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD}));
+		doSendEventAndConsumeAll(m, UPLOAD_RECORD);
+		assertThat(m.getState().getIds()).containsOnly(new String[] { RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING });
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD}));
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING});
 		persister.persist(m, "xxx");
 
-		assertThat(m.sendEvent(START_LOGGING_RECORD), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_IN_PROGRESS}));
-		persister.persist(m, "xxx");
-
-		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(CANCEL_RECORD_LOGGING), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD}));
+		doSendEventAndConsumeAll(m, SUSPEND_RECORD_LOGGING);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(RESUME_RECORD_LOGGING), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING}));
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD});
+		persister.persist(m, "xxx");
+
+		doSendEventAndConsumeAll(m, START_LOGGING_RECORD);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_IN_PROGRESS});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(START_LOGGING_RECORD), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_IN_PROGRESS}));
+		doSendEventAndConsumeAll(m, CANCEL_RECORD_LOGGING);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_LOGGING_ON_HOLD});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(CANCEL_RECORD_LOGGING), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING}));
+		doSendEventAndConsumeAll(m, RESUME_RECORD_LOGGING);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(SUSPEND_RECORD_LOGGING_WITH_ERROR), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ON_HOLD_WITH_ERROR}));
+		doSendEventAndConsumeAll(m, START_LOGGING_RECORD);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_IN_PROGRESS});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(RESUME_RECORD_LOGGING), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING}));
+		doSendEventAndConsumeAll(m, CANCEL_RECORD_LOGGING);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(START_LOGGING_RECORD), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGING_IN_PROGRESS}));
+		doSendEventAndConsumeAll(m, SUSPEND_RECORD_LOGGING_WITH_ERROR);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ON_HOLD_WITH_ERROR});
 		persister.persist(m, "xxx");
 
 		m = loadStateMachine(factory, persister, "xxx");
-		assertThat(m.sendEvent(LOG_RECORD), is(true));
-		assertThat(m.getState().getIds(), containsInAnyOrder(new String[]{RECORD_LOGGED}));
+		doSendEventAndConsumeAll(m, RESUME_RECORD_LOGGING);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_ACTIVE, RECORD_AWAITING_LOGGING});
+		persister.persist(m, "xxx");
+
+		m = loadStateMachine(factory, persister, "xxx");
+		doSendEventAndConsumeAll(m, START_LOGGING_RECORD);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGING_IN_PROGRESS});
+		persister.persist(m, "xxx");
+
+		m = loadStateMachine(factory, persister, "xxx");
+		doSendEventAndConsumeAll(m, LOG_RECORD);
+		assertThat(m.getState().getIds()).containsOnly(new String[]{RECORD_LOGGED});
 		persister.persist(m, "xxx");
 	}
 

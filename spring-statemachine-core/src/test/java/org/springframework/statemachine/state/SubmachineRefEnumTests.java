@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +15,18 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
@@ -37,42 +37,39 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
  * Tests for submachine references.
  *
  * @author Janne Valkealahti
- *
  */
 public class SubmachineRefEnumTests extends AbstractStateMachineTests {
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testSubmachineRef() throws Exception {
 		context.register(Config2.class, Config1.class);
 		context.refresh();
-		StateMachine<TestStates, TestEvents> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S1));
-		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20));
-		machine.sendEvent(TestEvents.E2);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S30));
-		machine.sendEvent(TestEvents.E3);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S31));
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S1);
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20);
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S30);
+		doSendEventAndConsumeAll(machine, TestEvents.E3);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S31);
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testSubmachineRefDifferentTypes() throws Exception {
 		context.register(Config4.class, Config3.class);
 		context.refresh();
-		StateMachine<Object, Object> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
-		machine.start();
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States1.S1));
-		machine.sendEvent(Events1.E1);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States1.S2, States2.S20));
-		machine.sendEvent(Events2.E2);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States1.S2, States2.S21, States2.S30));
-		machine.sendEvent(Events2.E3);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States1.S2, States2.S21, States2.S31));
+		StateMachine<Object, Object> machine = resolveMachine(context);
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsOnly(States1.S1);
+		doSendEventAndConsumeAll(machine, Events1.E1);
+		assertThat(machine.getState().getIds()).containsOnly(States1.S2, States2.S20);
+		doSendEventAndConsumeAll(machine, Events2.E2);
+		assertThat(machine.getState().getIds()).containsOnly(States1.S2, States2.S21, States2.S30);
+		doSendEventAndConsumeAll(machine, Events2.E3);
+		assertThat(machine.getState().getIds()).containsOnly(States1.S2, States2.S21, States2.S31);
 	}
 
 	@Configuration

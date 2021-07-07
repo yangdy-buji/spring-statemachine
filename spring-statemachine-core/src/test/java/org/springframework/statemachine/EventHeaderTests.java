@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,19 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.StateMachineConfigurerAdapter;
@@ -44,12 +43,11 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		return new AnnotationConfigApplicationContext();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs1() throws InterruptedException {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1I = context.getBean("headerTestAction1I", HeaderTestAction.class);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
@@ -58,44 +56,43 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1I.testHeader, is("testValue"));
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction11.testHeader, is("testValue"));
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1I.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction11.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 
 		headerTestAction1.testHeader = null;
 		headerTestAction11.testHeader = null;
 		headerTestAction111.testHeader = null;
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, nullValue());
-		assertThat(headerTestAction112.testHeader, is("testValue"));
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isNull();
+		assertThat(headerTestAction112.testHeader).isEqualTo("testValue");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs2() throws InterruptedException {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
 		HeaderTestAction headerTestAction111 = context.getBean("headerTestAction111", HeaderTestAction.class);
@@ -103,43 +100,42 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction11.testHeader, is("testValue"));
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction11.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 
 		headerTestAction1.testHeader = null;
 		headerTestAction11.testHeader = null;
 		headerTestAction111.testHeader = null;
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, nullValue());
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isNull();
+		assertThat(headerTestAction112.testHeader).isNull();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs3() throws InterruptedException {
 		context.register(Config1.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1I = context.getBean("headerTestAction1I", HeaderTestAction.class);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
@@ -148,21 +144,21 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		headerTestAction1I.testHeader = null;
 		headerTestAction1.testHeader = null;
@@ -170,23 +166,22 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		headerTestAction111.testHeader = null;
 		headerTestAction112.testHeader = null;
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E3").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E3").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1I.testHeader, nullValue());
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1I.testHeader).isNull();
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs1Threading() throws InterruptedException {
 		context.register(Config2.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1I = context.getBean("headerTestAction1I", HeaderTestAction.class);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
@@ -195,44 +190,43 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1I.testHeader, is("testValue"));
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction11.testHeader, is("testValue"));
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1I.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction11.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 
 		headerTestAction1.testHeader = null;
 		headerTestAction11.testHeader = null;
 		headerTestAction111.testHeader = null;
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, nullValue());
-		assertThat(headerTestAction112.testHeader, is("testValue"));
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isNull();
+		assertThat(headerTestAction112.testHeader).isEqualTo("testValue");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs2Threading() throws InterruptedException {
 		context.register(Config2.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
 		HeaderTestAction headerTestAction111 = context.getBean("headerTestAction111", HeaderTestAction.class);
@@ -240,43 +234,42 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction11.testHeader, is("testValue"));
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction11.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 
 		headerTestAction1.testHeader = null;
 		headerTestAction11.testHeader = null;
 		headerTestAction111.testHeader = null;
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, "E2");
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, nullValue());
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isNull();
+		assertThat(headerTestAction112.testHeader).isNull();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedToInitialInSubs3Threading() throws InterruptedException {
 		context.register(Config2.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1I = context.getBean("headerTestAction1I", HeaderTestAction.class);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction11 = context.getBean("headerTestAction11", HeaderTestAction.class);
@@ -285,21 +278,21 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E2").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		headerTestAction1I.testHeader = null;
 		headerTestAction1.testHeader = null;
@@ -307,71 +300,69 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		headerTestAction111.testHeader = null;
 		headerTestAction112.testHeader = null;
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E3").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E3").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
-		assertThat(headerTestAction1I.testHeader, nullValue());
-		assertThat(headerTestAction1.testHeader, nullValue());
-		assertThat(headerTestAction11.testHeader, nullValue());
-		assertThat(headerTestAction111.testHeader, is("testValue"));
-		assertThat(headerTestAction112.testHeader, nullValue());
+		assertThat(headerTestAction1I.testHeader).isNull();
+		assertThat(headerTestAction1.testHeader).isNull();
+		assertThat(headerTestAction11.testHeader).isNull();
+		assertThat(headerTestAction111.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction112.testHeader).isNull();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedWithAnonymousTransition() throws InterruptedException {
 		context.register(Config3.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction2 = context.getBean("headerTestAction2", HeaderTestAction.class);
 		HeaderTestAction headerTestAction3 = context.getBean("headerTestAction3", HeaderTestAction.class);
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction2.testHeader, is("testValue"));
-		assertThat(headerTestAction3.testHeader, is("testValue"));
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction2.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction3.testHeader).isEqualTo("testValue");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testHeaderPassedWithAnonymousTransitionThreading() throws InterruptedException {
 		context.register(Config4.class);
 		context.refresh();
-		StateMachine<String, String> machine = context.getBean(StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		HeaderTestAction headerTestAction1 = context.getBean("headerTestAction1", HeaderTestAction.class);
 		HeaderTestAction headerTestAction2 = context.getBean("headerTestAction2", HeaderTestAction.class);
 		HeaderTestAction headerTestAction3 = context.getBean("headerTestAction3", HeaderTestAction.class);
 		TestListener listener = new TestListener();
 		listener.reset(1);
 		machine.addStateListener(listener);
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
+		assertThat(listener.stateMachineStartedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
 
 		listener.reset(3);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("testHeader", "testValue").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
 
-		assertThat(headerTestAction1.testHeader, is("testValue"));
-		assertThat(headerTestAction2.testHeader, is("testValue"));
-		assertThat(headerTestAction3.testHeader, is("testValue"));
+		assertThat(headerTestAction1.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction2.testHeader).isEqualTo("testValue");
+		assertThat(headerTestAction3.testHeader).isEqualTo("testValue");
 	}
 
 	@Configuration
@@ -510,13 +501,6 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		public HeaderTestAction headerTestAction112() {
 			return new HeaderTestAction();
 		}
-
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-			executor.setCorePoolSize(1);
-			return executor;
-		}
 	}
 
 	@Configuration
@@ -610,13 +594,6 @@ public class EventHeaderTests extends AbstractStateMachineTests {
 		@Bean
 		public HeaderTestAction headerTestAction3() {
 			return new HeaderTestAction();
-		}
-
-		@Bean(name = StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-			executor.setCorePoolSize(3);
-			return executor;
 		}
 	}
 

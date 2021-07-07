@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ public abstract class TreeTraverser<T> {
 	public abstract Iterable<T> children(T root);
 
 	public final Iterable<T> postOrderTraversal(final T root) {
-		Assert.notNull(root, "root should not be null");
+		Assert.notNull(root, "root cannot be null");
 		return new Iterable<T>() {
 			@Override
 			public Iterator<T> iterator() {
@@ -49,8 +49,8 @@ public abstract class TreeTraverser<T> {
 		final Iterator<T> childIterator;
 
 		PostOrderNode(T root, Iterator<T> childIterator) {
-			Assert.notNull(root, "root should not be null");
-			Assert.notNull(childIterator, "childIterator should not be null");
+			Assert.notNull(root, "root cannot be null");
+			Assert.notNull(childIterator, "childIterator cannot be null");
 			this.root = root;
 			this.childIterator = childIterator;
 		}

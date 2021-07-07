@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,15 @@
  */
 package org.springframework.statemachine.data;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Iterator;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -55,13 +55,13 @@ public abstract class AbstractRepositoryTests {
 
 	protected AnnotationConfigApplicationContext context;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		cleanInternal();
 		context = buildContext();
 	}
 
-	@After
+	@AfterEach
 	public void clean() {
 		if (context != null) {
 			context.close();
@@ -346,9 +346,9 @@ public abstract class AbstractRepositoryTests {
 				break;
 			}
 		}
-		assertThat(endState, notNullValue());
-		assertThat(endState.getPseudoState(), notNullValue());
-		assertThat(endState.getPseudoState().getKind(), is(PseudoStateKind.END));
+		assertThat(endState).isNotNull();
+		assertThat(endState.getPseudoState()).isNotNull();
+		assertThat(endState.getPseudoState().getKind()).isEqualTo(PseudoStateKind.END);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -428,6 +428,26 @@ public abstract class AbstractRepositoryTests {
 					.step().sendEvent("E1").expectStates("S2").and()
 					.build();
 		plan.test();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testMachine15() throws Exception {
+		context.register(getRegisteredClasses());
+		context.register(Config15.class, FactoryConfig.class);
+		context.refresh();
+		StateMachineFactory<String, String> stateMachineFactory = context.getBean(StateMachineFactory.class);
+		StateMachine<String, String> stateMachine = stateMachineFactory.getStateMachine();
+
+		Map<String, State<String, String>> states = stateMachine.getStates().stream().collect(Collectors.toMap((State<String, String> s1) -> s1.getId(), s2 -> s2));
+		assertThat(states.size()).isEqualTo(2);
+
+		State<String,String> S1 = (State<String, String>) states.get("S1");
+		assertThat(S1.getExitActions().size()).isEqualTo(1);
+
+		State<String,String> S2 = (State<String,String>)states.get("S2");
+		assertThat(S2.getEntryActions().size()).isEqualTo(1);
+		assertThat(S2.getStateActions().size()).isEqualTo(1);
 	}
 
 	@Configuration
@@ -601,6 +621,17 @@ public abstract class AbstractRepositoryTests {
 		public StateMachineJackson2RepositoryPopulatorFactoryBean jackson2RepositoryPopulatorFactoryBean() {
 			StateMachineJackson2RepositoryPopulatorFactoryBean factoryBean = new StateMachineJackson2RepositoryPopulatorFactoryBean();
 			factoryBean.setResources(new Resource[]{new ClassPathResource("data14.json")});
+			return factoryBean;
+		}
+	}
+
+	@Configuration
+	public static class Config15 {
+
+		@Bean
+		public StateMachineJackson2RepositoryPopulatorFactoryBean jackson2RepositoryPopulatorFactoryBean() {
+			StateMachineJackson2RepositoryPopulatorFactoryBean factoryBean = new StateMachineJackson2RepositoryPopulatorFactoryBean();
+			factoryBean.setResources(new Resource[]{new ClassPathResource("data15.json")});
 			return factoryBean;
 		}
 	}

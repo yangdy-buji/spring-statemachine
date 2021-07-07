@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,10 @@
  */
 package org.springframework.statemachine;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -30,12 +28,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
@@ -58,20 +54,18 @@ public class StateMachineTests extends AbstractStateMachineTests {
 	public void testLoggingEvents() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		@SuppressWarnings("unchecked")
-		ObjectStateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
-		machine.start();
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).setHeader("foo", "jee1").build());
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E2).setHeader("foo", "jee2").build());
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E4).setHeader("foo", "jee2").build());
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload(TestEvents.E1).setHeader("foo", "jee1").build());
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload(TestEvents.E2).setHeader("foo", "jee2").build());
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload(TestEvents.E4).setHeader("foo", "jee2").build());
 	}
 
 	@Test
 	public void testTimerTransition() throws Exception {
-		context.register(BaseConfig.class, Config2.class);
+		context.register(Config2.class);
 		context.refresh();
 
 		TestAction testAction1 = context.getBean("testAction1", TestAction.class);
@@ -79,122 +73,113 @@ public class StateMachineTests extends AbstractStateMachineTests {
 		TestAction testAction3 = context.getBean("testAction3", TestAction.class);
 		TestAction testAction4 = context.getBean("testAction4", TestAction.class);
 
-		@SuppressWarnings("unchecked")
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		listener.reset(1);
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(testAction2.stateContexts.size(), is(0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(testAction2.stateContexts).isEmpty();
 
 
 		listener.reset(0, 1);
-		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction1.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction1.stateContexts.size(), is(1));
-		assertThat(testAction2.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction2.stateContexts.size(), is(1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction1.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction1.stateContexts).hasSize(1);
+		assertThat(testAction2.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction2.stateContexts).hasSize(1);
 
 		listener.reset(0, 1);
-		machine.sendEvent(TestEvents.E2);
-		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction3.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction3.stateContexts.size(), is(1));
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction3.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction3.stateContexts).hasSize(1);
 
 		// timer still fires but should not cause transition anymore
 		// after we sleep and do next event
 		int timedTriggered = testAction2.stateContexts.size();
 		Thread.sleep(2000);
-		assertThat(testAction2.stateContexts.size(), is(timedTriggered));
+		assertThat(testAction2.stateContexts).hasSize(timedTriggered);
 
 		listener.reset(0, 1);
-		machine.sendEvent(TestEvents.E3);
-		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction4.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testAction4.stateContexts.size(), is(1));
-		assertThat(testAction2.stateContexts.size(), is(timedTriggered));
+		doSendEventAndConsumeAll(machine, TestEvents.E3);
+		assertThat(listener.transitionLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction4.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testAction4.stateContexts).hasSize(1);
+		assertThat(testAction2.stateContexts).hasSize(timedTriggered);
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testForkJoin() throws Exception {
-		context.register(BaseConfig.class, Config3.class);
+		context.register(Config3.class);
 		context.refresh();
-		ObjectStateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 
 		listener.reset(1);
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), contains(TestStates.SI));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
 
 		listener.reset(3);
-		machine.sendEvent(TestEvents.E1);
-		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S20, TestStates.S30));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(listener.stateChangedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S20, TestStates.S30);
 
 		listener.reset(1);
-		machine.sendEvent(TestEvents.E2);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S2, TestStates.S21, TestStates.S30));
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S2, TestStates.S21, TestStates.S30);
 
 		listener.reset(2);
-		machine.sendEvent(TestEvents.E3);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(2));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(TestStates.S4));
+		doSendEventAndConsumeAll(machine, TestEvents.E3);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
+		assertThat(machine.getState().getIds()).containsOnly(TestStates.S4);
 	}
 
 	@Test
 	public void testStringStatesAndEvents() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
+		StateMachine<String, String> machine = resolveMachine(context);
 
 		TestListener2 listener = new TestListener2();
 		machine.addStateListener(listener);
 
-
-		assertThat(machine, notNullValue());
-		machine.start();
+		assertThat(machine).isNotNull();
+		doStartAndAssert(machine);
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload("E1").setHeader("foo", "jee1").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder("S1"));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload("E1").setHeader("foo", "jee1").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly("S1");
 	}
 
 	@Test
 	public void testBackToItself() {
-		context.register(BaseConfig.class, Config5.class);
+		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		assertThat(machine, notNullValue());
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		assertThat(machine).isNotNull();
 		TestStateEntryExitListener listener = new TestStateEntryExitListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(machine.getState().getIds(), contains(TestStates.SI));
+		doStartAndAssert(machine);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
 		listener.reset();
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(machine.getState().getIds(), contains(TestStates.SI));
-		assertThat(listener.exited.size(), is(1));
-		assertThat(listener.entered.size(), is(1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
+		assertThat(listener.exited).hasSize(1);
+		assertThat(listener.entered).hasSize(1);
 	}
 
 	private static class LoggingAction implements Action<TestStates, TestEvents> {
@@ -262,12 +247,6 @@ public class StateMachineTests extends AbstractStateMachineTests {
 		public LoggingAction loggingAction() {
 			return new LoggingAction("as bean");
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration

@@ -1,11 +1,11 @@
 /*
- * Copyright 2017-2018 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,10 @@
 package org.springframework.statemachine.data.jpa;
 
 import javax.persistence.Entity;
-import javax.persistence.Id;
 import javax.persistence.Lob;
+import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.Column;
 
 import org.springframework.statemachine.data.RepositoryStateMachine;
 
@@ -32,16 +33,19 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
  *
  */
 @Entity
-@Table(name = "StateMachine")
+@Table(name = "state_machine")
 @JsonIdentityInfo(generator=ObjectIdGenerators.IntSequenceGenerator.class)
 public class JpaRepositoryStateMachine extends RepositoryStateMachine {
 
 	@Id
+	@Column(name = "machine_id")
 	private String machineId;
 
+	@Column(name = "state")
 	private String state;
 
 	@Lob
+	@Column(name = "state_machine_context", length = 10240)
 	private byte[] stateMachineContext;
 
 	@Override

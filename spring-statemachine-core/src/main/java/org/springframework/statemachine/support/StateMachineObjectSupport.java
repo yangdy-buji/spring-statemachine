@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package org.springframework.statemachine.support;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,7 +26,6 @@ import org.springframework.core.OrderComparator;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.event.StateMachineEventPublisher;
 import org.springframework.statemachine.listener.CompositeStateMachineListener;
 import org.springframework.statemachine.listener.StateMachineListener;
@@ -34,6 +34,8 @@ import org.springframework.statemachine.processor.StateMachineHandlerCallHelper;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.util.Assert;
+
+import reactor.core.publisher.Mono;
 
 /**
  * Support and helper class for base state machine implementation.
@@ -61,9 +63,7 @@ public abstract class StateMachineObjectSupport<S, E> extends LifecycleObjectSup
 	private volatile boolean handlersInitialized;
 	private final StateMachineHandlerCallHelper<S, E> stateMachineHandlerCallHelper = new StateMachineHandlerCallHelper<S, E>();
 
-	@Override
 	protected void doStart() {
-		super.doStart();
 		if (!handlersInitialized) {
 			try {
 				stateMachineHandlerCallHelper.setBeanFactory(getBeanFactory());
@@ -330,22 +330,13 @@ public abstract class StateMachineObjectSupport<S, E> extends LifecycleObjectSup
 		}
 	}
 
-	protected void notifyActionMonitor(StateMachine<S, E> stateMachine, Action<S, E> action, long duration) {
+	protected void notifyActionMonitor(StateMachine<S, E> stateMachine, Function<StateContext<S, E>, Mono<Void>> action,
+			long duration) {
 		try {
 			stateMachineMonitor.action(stateMachine, action, duration);
 		} catch (Exception e) {
 			log.warn("Error during notifyTransitionMonitor", e);
 		}
-	}
-
-	protected void stateChangedInRelay() {
-		// TODO: this is a temporary tweak to know when state is
-		//       changed in a submachine/regions order to give
-		//       state machine a change to request executor login again
-		//       which is needed when we use multiple thread. with multiple
-		//       threads submachines may do their stuff after thread handling
-		//       main machine has already finished its execution logic, thus
-		//       re-scheduling is needed.
 	}
 
 	protected StateMachineInterceptorList<S, E> getStateMachineInterceptors() {
@@ -367,7 +358,6 @@ public abstract class StateMachineObjectSupport<S, E> extends LifecycleObjectSup
 		@Override
 		public void stateChanged(State<S, E> from, State<S, E> to) {
 			stateListener.stateChanged(from, to);
-			stateChangedInRelay();
 		}
 
 		@Override
@@ -424,7 +414,5 @@ public abstract class StateMachineObjectSupport<S, E> extends LifecycleObjectSup
 		public void stateContext(StateContext<S, E> stateContext) {
 			stateListener.stateContext(stateContext);
 		}
-
 	}
-
 }

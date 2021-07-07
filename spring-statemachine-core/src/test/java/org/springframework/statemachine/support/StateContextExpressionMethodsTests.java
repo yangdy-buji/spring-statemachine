@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2018 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,17 @@
  */
 package org.springframework.statemachine.support;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -34,10 +35,9 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.access.StateMachineAccessor;
-import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.action.ActionListener;
-import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.security.SecurityRule;
 import org.springframework.statemachine.state.EnumState;
@@ -45,6 +45,9 @@ import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.statemachine.transition.TransitionKind;
 import org.springframework.statemachine.trigger.Trigger;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class StateContextExpressionMethodsTests {
 
@@ -55,14 +58,14 @@ public class StateContextExpressionMethodsTests {
 		StateContextExpressionMethods methods = new StateContextExpressionMethods(evaluationContext);
 		StateContext<SpelStates, SpelEvents> stateContext = mockStateContext(null);
 
-		assertThat(methods.getValue(parser.parseExpression("true"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("event.toString().equals('E1')"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("event==T(org.springframework.statemachine.support.StateContextExpressionMethodsTests.SpelEvents).E1"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("getExtendedState().getVariables().get('boolean1')"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean1')"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean1')&&!extendedState.variables.get('boolean2')"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean3')==NULL"), stateContext, Boolean.class), is(true));
-		assertThat(methods.getValue(parser.parseExpression("transition.source.id.toString().equals('S1')"), stateContext, Boolean.class), is(true));
+		assertThat(methods.getValue(parser.parseExpression("true"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("event.toString().equals('E1')"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("event==T(org.springframework.statemachine.support.StateContextExpressionMethodsTests.SpelEvents).E1"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("getExtendedState().getVariables().get('boolean1')"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean1')"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean1')&&!extendedState.variables.get('boolean2')"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("extendedState.variables.get('boolean3')==NULL"), stateContext, Boolean.class)).isTrue();
+		assertThat(methods.getValue(parser.parseExpression("transition.source.id.toString().equals('S1')"), stateContext, Boolean.class)).isTrue();
 	}
 
 	@Test
@@ -73,8 +76,8 @@ public class StateContextExpressionMethodsTests {
 		MockStatemachine stateMachine = new MockStatemachine();
 		StateContext<SpelStates, SpelEvents> stateContext = mockStateContext(stateMachine);
 
-		assertThat(methods.getValue(parser.parseExpression("stateMachine.sendEvent(T(org.springframework.statemachine.support.StateContextExpressionMethodsTests.SpelEvents).E1)"), stateContext, Boolean.class), is(true));
-		assertThat(stateMachine.events.size(), is(1));
+		assertThat(methods.getValue(parser.parseExpression("stateMachine.sendEvent(T(org.springframework.statemachine.support.StateContextExpressionMethodsTests.SpelEvents).E1)"), stateContext, Boolean.class)).isTrue();
+		assertThat(stateMachine.events).hasSize(1);
 	}
 
 	enum SpelStates {
@@ -101,12 +104,13 @@ public class StateContextExpressionMethodsTests {
 	private static class MockTransition implements Transition<SpelStates, SpelEvents> {
 
 		@Override
-		public boolean transit(StateContext<SpelStates, SpelEvents> context) {
-			return false;
+		public Mono<Boolean> transit(StateContext<SpelStates, SpelEvents> context) {
+			return Mono.just(false);
 		}
 
 		@Override
-		public void executeTransitionActions(StateContext<SpelStates, SpelEvents> context) {
+		public Mono<Void> executeTransitionActions(StateContext<SpelStates, SpelEvents> context) {
+			return null;
 		}
 
 		@Override
@@ -120,12 +124,12 @@ public class StateContextExpressionMethodsTests {
 		}
 
 		@Override
-		public Guard<SpelStates, SpelEvents> getGuard() {
+		public Function<StateContext<SpelStates, SpelEvents>, Mono<Boolean>> getGuard() {
 			return null;
 		}
 
 		@Override
-		public Collection<Action<SpelStates, SpelEvents>> getActions() {
+		public Collection<Function<StateContext<SpelStates, SpelEvents>, Mono<Void>>> getActions() {
 			return null;
 		}
 
@@ -163,22 +167,52 @@ public class StateContextExpressionMethodsTests {
 		}
 
 		@Override
+		public Mono<Void> startReactively() {
+			return null;
+		}
+
+		@Override
+		public Mono<Void> stopReactively() {
+			return null;
+		}
+
+		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void start() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void stop() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(Message<SpelEvents> event) {
 			events.add(event);
 			return true;
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(SpelEvents event) {
 			return sendEvent(MessageBuilder.createMessage(event, new MessageHeaders(new HashMap<String, Object>())));
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<SpelStates, SpelEvents>> sendEvent(Mono<Message<SpelEvents>> event) {
+			return null;
+		}
+
+		@Override
+		public Mono<List<StateMachineEventResult<SpelStates, SpelEvents>>> sendEventCollect(
+				Mono<Message<SpelEvents>> event) {
+			return null;
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<SpelStates, SpelEvents>> sendEvents(Flux<Message<SpelEvents>> events) {
+			return null;
 		}
 
 		@Override

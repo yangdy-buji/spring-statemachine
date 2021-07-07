@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,16 @@
  */
 package org.springframework.statemachine.docs;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
 
 import java.util.EnumSet;
 
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.annotation.OnTransition;
 import org.springframework.statemachine.annotation.WithStateMachine;
@@ -31,6 +34,8 @@ import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.config.StateMachineBuilder.Builder;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
+
+import reactor.core.publisher.Mono;
 
 public class IntroSample {
 
@@ -94,20 +99,27 @@ public class IntroSample {
 		StateMachine<States, Events> stateMachine;
 
 		void doSignals() {
-			stateMachine.sendEvent(Events.EVENT1);
-			stateMachine.sendEvent(Events.EVENT2);
+			stateMachine
+				.sendEvent(Mono.just(MessageBuilder
+					.withPayload(Events.EVENT1).build()))
+				.subscribe();
+			stateMachine
+				.sendEvent(Mono.just(MessageBuilder
+					.withPayload(Events.EVENT2).build()))
+				.subscribe();
 		}
 	}
 // end::snippetD[]
 
+	@Test
 	public void testManual() throws Exception {
 		StateMachine<States, Events> stateMachine = buildMachine();
-		stateMachine.start();
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(States.STATE1));
-		stateMachine.sendEvent(Events.EVENT1);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(States.STATE2));
-		stateMachine.sendEvent(Events.EVENT2);
-		assertThat(stateMachine.getState().getIds(), containsInAnyOrder(States.STATE1));
+		doStartAndAssert(stateMachine);
+		assertThat(stateMachine.getState().getIds()).containsOnly(States.STATE1);
+		doSendEventAndConsumeAll(stateMachine, Events.EVENT1);
+		assertThat(stateMachine.getState().getIds()).containsOnly(States.STATE2);
+		doSendEventAndConsumeAll(stateMachine, Events.EVENT2);
+		assertThat(stateMachine.getState().getIds()).containsOnly(States.STATE1);
 	}
 
 	public StateMachine<States, Events> buildMachine() throws Exception {

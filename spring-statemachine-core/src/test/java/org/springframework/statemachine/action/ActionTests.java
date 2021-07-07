@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,26 +15,21 @@
  */
 package org.springframework.statemachine.action;
 
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -48,57 +43,48 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
  */
 public class ActionTests extends AbstractStateMachineTests {
 
-	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testTransitionActions() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		machine.start();
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		doStartAndAssert(machine);
 
 		TestCountAction testAction1 = context.getBean("testAction1", TestCountAction.class);
 		TestCountAction testAction2 = context.getBean("testAction2", TestCountAction.class);
 		TestCountAction testAction3 = context.getBean("testAction3", TestCountAction.class);
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E2).build());
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E3).build());
-		assertThat(testAction1.count, is(1));
-		assertThat(testAction2.count, is(1));
-		assertThat(testAction3.count, is(1));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		doSendEventAndConsumeAll(machine, TestEvents.E3);
+		assertThat(testAction1.count).isEqualTo(1);
+		assertThat(testAction2.count).isEqualTo(1);
+		assertThat(testAction3.count).isEqualTo(1);
 	}
 
-	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testTransitionActionErrors() {
 		context.register(Config2.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		machine.start();
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		doStartAndAssert(machine);
 
 		TestCountAction testAction1 = context.getBean("testAction1", TestCountAction.class);
 		TestCountAction testErrorAction = context.getBean("testErrorAction", TestCountAction.class);
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(testAction1.count, is(1));
-		assertThat(testErrorAction.count, is(1));
-		assertThat(testErrorAction.context, notNullValue());
-		assertThat(testErrorAction.context.getException(), notNullValue());
-		assertThat(testErrorAction.context.getException(), instanceOf(RuntimeException.class));
-		assertThat(testErrorAction.context.getException().getMessage(), is("Fake Error"));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(testAction1.count).isEqualTo(1);
+		assertThat(testErrorAction.count).isEqualTo(1);
+		assertThat(testErrorAction.context).isNotNull();
+		assertThat(testErrorAction.context.getException()).isNotNull();
+		assertThat(testErrorAction.context.getException()).isInstanceOf(RuntimeException.class);
+		assertThat(testErrorAction.context.getException().getMessage()).isEqualTo("Fake Error");
 	}
 
-	@SuppressWarnings({ "unchecked" })
 	@Test
 	public void testStateActionErrors() throws Exception {
 		context.register(Config3.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
-		StateMachine<TestStates,TestEvents> machine =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
-		machine.start();
+		StateMachine<TestStates, TestEvents> machine = resolveMachine(context);
+		doStartAndAssert(machine);
 
 		TestCountAction testAction2 = context.getBean("testAction2", TestCountAction.class);
 		TestCountAction testAction3 = context.getBean("testAction3", TestCountAction.class);
@@ -107,34 +93,34 @@ public class ActionTests extends AbstractStateMachineTests {
 		TestCountAction testErrorAction3 = context.getBean("testErrorAction3", TestCountAction.class);
 		TestCountAction testErrorAction4 = context.getBean("testErrorAction4", TestCountAction.class);
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E1).build());
-		assertThat(machine.getState().getId(), is(TestStates.S2));
-		assertThat(testErrorAction3.latch.await(1, TimeUnit.SECONDS), is(true));
-		assertThat(testErrorAction2.latch.await(1, TimeUnit.SECONDS), is(true));
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(machine.getState().getId()).isEqualTo(TestStates.S2);
+		assertThat(testErrorAction3.latch.await(1, TimeUnit.SECONDS)).isTrue();
+		assertThat(testErrorAction2.latch.await(1, TimeUnit.SECONDS)).isTrue();
 
-		machine.sendEvent(MessageBuilder.withPayload(TestEvents.E2).build());
-		assertThat(testErrorAction4.latch.await(1, TimeUnit.SECONDS), is(true));
+		doSendEventAndConsumeAll(machine, TestEvents.E2);
+		assertThat(testErrorAction4.latch.await(1, TimeUnit.SECONDS)).isTrue();
 
-		assertThat(testAction2.count, is(1));
-		assertThat(testErrorAction2.count, is(1));
-		assertThat(testErrorAction2.context, notNullValue());
-		assertThat(testErrorAction2.context.getException(), notNullValue());
-		assertThat(testErrorAction2.context.getException(), instanceOf(RuntimeException.class));
-		assertThat(testErrorAction2.context.getException().getMessage(), is("Fake Error"));
+		assertThat(testAction2.count).isEqualTo(1);
+		assertThat(testErrorAction2.count).isEqualTo(1);
+		assertThat(testErrorAction2.context).isNotNull();
+		assertThat(testErrorAction2.context.getException()).isNotNull();
+		assertThat(testErrorAction2.context.getException()).isInstanceOf(RuntimeException.class);
+		assertThat(testErrorAction2.context.getException().getMessage()).isEqualTo("Fake Error");
 
-		assertThat(testAction3.count, is(1));
-		assertThat(testErrorAction3.count, is(1));
-		assertThat(testErrorAction3.context, notNullValue());
-		assertThat(testErrorAction3.context.getException(), notNullValue());
-		assertThat(testErrorAction3.context.getException(), instanceOf(RuntimeException.class));
-		assertThat(testErrorAction3.context.getException().getMessage(), is("Fake Error"));
+		assertThat(testAction3.count).isEqualTo(1);
+		assertThat(testErrorAction3.count).isEqualTo(1);
+		assertThat(testErrorAction3.context).isNotNull();
+		assertThat(testErrorAction3.context.getException()).isNotNull();
+		assertThat(testErrorAction3.context.getException()).isInstanceOf(RuntimeException.class);
+		assertThat(testErrorAction3.context.getException().getMessage()).isEqualTo("Fake Error");
 
-		assertThat(testAction4.count, is(1));
-		assertThat(testErrorAction4.count, is(1));
-		assertThat(testErrorAction4.context, notNullValue());
-		assertThat(testErrorAction4.context.getException(), notNullValue());
-		assertThat(testErrorAction4.context.getException(), instanceOf(RuntimeException.class));
-		assertThat(testErrorAction4.context.getException().getMessage(), is("Fake Error"));
+		assertThat(testAction4.count).isEqualTo(1);
+		assertThat(testErrorAction4.count).isEqualTo(1);
+		assertThat(testErrorAction4.context).isNotNull();
+		assertThat(testErrorAction4.context.getException()).isNotNull();
+		assertThat(testErrorAction4.context.getException()).isInstanceOf(RuntimeException.class);
+		assertThat(testErrorAction4.context.getException().getMessage()).isEqualTo("Fake Error");
 	}
 
 	@Test
@@ -217,11 +203,6 @@ public class ActionTests extends AbstractStateMachineTests {
 		public TestCountAction testAction3() {
 			return new TestCountAction();
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
 	}
 
 	@Configuration
@@ -262,12 +243,6 @@ public class ActionTests extends AbstractStateMachineTests {
 		public TestCountAction testErrorAction() {
 			return new TestCountAction();
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration

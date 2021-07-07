@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,16 @@
  */
 package org.springframework.statemachine.state;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
 import org.springframework.statemachine.StateMachineSystemConstants;
@@ -54,13 +50,34 @@ public class StateActionTests extends AbstractStateMachineTests {
 				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 		TestExitAction testExitAction = ctx.getBean("testExitAction", TestExitAction.class);
 		TestEntryAction testEntryAction = ctx.getBean("testEntryAction", TestEntryAction.class);
-		assertThat(testExitAction, notNullValue());
-		assertThat(testEntryAction, notNullValue());
+		assertThat(testExitAction).isNotNull();
+		assertThat(testEntryAction).isNotNull();
 
 		machine.start();
 		machine.sendEvent(TestEvents.E1);
-		assertThat(testExitAction.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(testEntryAction.onExecuteLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(testExitAction.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(testEntryAction.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
+
+		ctx.close();
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testEndStateEntryAction() throws Exception {
+		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(Config2.class);
+		ObjectStateMachine<TestStates,TestEvents> machine =
+				ctx.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
+		TestEntryAction testEntryAction = ctx.getBean("testEntryAction", TestEntryAction.class);
+		machine.start();
+
+		assertThat(machine).isNotNull();
+		assertThat(machine.isComplete()).isFalse();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SI);
+
+		machine.sendEvent(TestEvents.E1);
+		assertThat(machine.isComplete()).isTrue();
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.SF);
+		assertThat(testEntryAction.onExecuteLatch.await(2, TimeUnit.SECONDS)).isTrue();
 
 		ctx.close();
 	}
@@ -98,12 +115,34 @@ public class StateActionTests extends AbstractStateMachineTests {
 		public Action<TestStates, TestEvents> testExitAction() {
 			return new TestExitAction();
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
+	@Configuration
+	@EnableStateMachine
+	static class Config2 extends EnumStateMachineConfigurerAdapter<TestStates, TestEvents> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<TestStates, TestEvents> states) throws Exception {
+			states
+				.withStates()
+					.initial(TestStates.SI)
+					.state(TestStates.SI)
+					.state(TestStates.SF, testEntryAction(), null)
+					.end(TestStates.SF);
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<TestStates, TestEvents> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source(TestStates.SI)
+					.target(TestStates.SF)
+					.event(TestEvents.E1);
+		}
+
+		@Bean
+		public Action<TestStates, TestEvents> testEntryAction() {
+			return new TestEntryAction();
+		}
+	}
 }

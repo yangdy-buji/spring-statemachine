@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,14 +26,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachineException;
 import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.StateMachineBuilder;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
@@ -41,6 +40,7 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.AbstractCompositeListener;
 import org.springframework.statemachine.recipes.support.RunnableAction;
+import org.springframework.statemachine.region.RegionExecutionPolicy;
 import org.springframework.statemachine.state.PseudoStateKind;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
@@ -51,6 +51,8 @@ import org.springframework.statemachine.support.tree.Tree;
 import org.springframework.statemachine.support.tree.Tree.Node;
 import org.springframework.statemachine.support.tree.TreeTraverser;
 import org.springframework.statemachine.transition.Transition;
+
+import reactor.core.publisher.Mono;
 
 /**
  * {@code TasksHandler} is a recipe for executing arbitrary {@link Runnable} tasks
@@ -104,13 +106,7 @@ public class TasksHandler {
 			if (persist != null) {
 				final LocalStateMachineInterceptor interceptor = new LocalStateMachineInterceptor(persist);
 				stateMachine.getStateMachineAccessor()
-					.doWithAllRegions(new StateMachineFunction<StateMachineAccess<String, String>>() {
-
-					@Override
-					public void apply(StateMachineAccess<String, String> function) {
-						function.addStateMachineInterceptor(interceptor);
-					}
-				});
+					.doWithAllRegions(function -> function.addStateMachineInterceptor(interceptor));
 			}
 		} catch (Exception e) {
 			throw new StateMachineException("Error building state machine from tasks", e);
@@ -124,21 +120,30 @@ public class TasksHandler {
 	 * Request to execute current tasks logic.
 	 */
 	public void runTasks() {
-		stateMachine.sendEvent(EVENT_RUN);
+		stateMachine
+			.sendEvent(Mono.just(MessageBuilder
+				.withPayload(EVENT_RUN).build()))
+			.subscribe();
 	}
 
 	/**
 	 * Request to continue from an error.
 	 */
 	public void continueFromError() {
-		stateMachine.sendEvent(EVENT_CONTINUE);
+		stateMachine
+			.sendEvent(Mono.just(MessageBuilder
+				.withPayload(EVENT_CONTINUE).build()))
+			.subscribe();
 	}
 
 	/**
 	 * Request to fix current problems.
 	 */
 	public void fixCurrentProblems() {
-		stateMachine.sendEvent(EVENT_FIX);
+		stateMachine
+			.sendEvent(Mono.just(MessageBuilder
+				.withPayload(EVENT_FIX).build()))
+			.subscribe();
 	}
 
 	/**
@@ -160,16 +165,9 @@ public class TasksHandler {
 			throw new StateMachineException("Error reading state from persistent store", e);
 		}
 
-		stateMachine.stop();
-		stateMachine.getStateMachineAccessor()
-			.doWithAllRegions(new StateMachineFunction<StateMachineAccess<String, String>>() {
-
-			@Override
-			public void apply(StateMachineAccess<String, String> function) {
-				function.resetStateMachine(context);
-			}
-		});
-		stateMachine.start();
+		stateMachine.stopReactively().block();
+		stateMachine.getStateMachineAccessor().doWithAllRegions(function -> function.resetStateMachine(context));
+		stateMachine.startReactively().block();
 	}
 
 	/**
@@ -231,9 +229,9 @@ public class TasksHandler {
 		StateMachineBuilder.Builder<String, String> builder = StateMachineBuilder.builder();
 
 		int taskCount = topLevelTaskCount(tasks);
-
-		builder.configureConfiguration().withConfiguration()
-			.taskExecutor(taskExecutor != null ? taskExecutor : taskExecutor(taskCount));
+		if (taskCount > 1) {
+			builder.configureConfiguration().withConfiguration().regionExecutionPolicy(RegionExecutionPolicy.PARALLEL);
+		}
 
 		StateMachineStateConfigurer<String, String> stateMachineStateConfigurer = builder.configureStates();
 		StateMachineTransitionConfigurer<String, String> stateMachineTransitionConfigurer = builder.configureTransitions();
@@ -318,13 +316,6 @@ public class TasksHandler {
 				.event(EVENT_FIX);
 
 		return builder.build();
-	}
-
-	private static TaskExecutor taskExecutor(int taskCount) {
-		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-		taskExecutor.afterPropertiesSet();
-		taskExecutor.setCorePoolSize(taskCount);
-		return taskExecutor;
 	}
 
 	private static int topLevelTaskCount(List<TaskWrapper> tasks) {
@@ -535,9 +526,15 @@ public class TasksHandler {
 					}
 				}
 				if (hasErrors) {
-					context.getStateMachine().sendEvent(EVENT_FALLBACK);
+					context.getStateMachine()
+						.sendEvent(Mono.just(MessageBuilder
+							.withPayload(EVENT_FALLBACK).build()))
+						.subscribe();
 				} else {
-					context.getStateMachine().sendEvent(EVENT_CONTINUE);
+					context.getStateMachine()
+						.sendEvent(Mono.just(MessageBuilder
+							.withPayload(EVENT_CONTINUE).build()))
+						.subscribe();
 				}
 			}
 		};
@@ -850,7 +847,8 @@ public class TasksHandler {
 
 		@Override
 		public void preStateChange(State<String, String> state, Message<String> message,
-				Transition<String, String> transition, StateMachine<String, String> stateMachine) {
+				Transition<String, String> transition, StateMachine<String, String> stateMachine,
+				StateMachine<String, String> rootStateMachine) {
 
 			// skip all other pseudostates than initial
 			if (state == null || (state.getPseudoState() != null && state.getPseudoState().getKind() != PseudoStateKind.INITIAL)) {

@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package org.springframework.statemachine.uml.support;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.function.Function;
 
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
@@ -37,9 +38,18 @@ import org.eclipse.uml2.uml.Transition;
 import org.eclipse.uml2.uml.Trigger;
 import org.eclipse.uml2.uml.UMLPackage;
 import org.eclipse.uml2.uml.resource.UMLResource;
+import org.springframework.expression.spel.SpelCompilerMode;
+import org.springframework.expression.spel.SpelParserConfiguration;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.action.Actions;
+import org.springframework.statemachine.action.SpelExpressionAction;
 import org.springframework.statemachine.config.model.StateMachineComponentResolver;
 import org.springframework.statemachine.transition.TransitionKind;
+import org.springframework.util.StringUtils;
+
+import reactor.core.publisher.Mono;
 
 /**
  * Utilities for uml model processing.
@@ -63,6 +73,21 @@ public abstract class UmlUtils {
 		Resource resource = resourceSet.getResource(modelUri, true);
 		Model m = (Model) EcoreUtil.getObjectByType(resource.getContents(), UMLPackage.Literals.MODEL);
 		return m;
+	}
+
+	/**
+	 * Gets the resource for a model.
+	 *
+	 * @param modelPath the model path
+	 * @return the resource
+	 */
+	public static Resource getResource(String modelPath) {
+		URI modelUri = URI.createFileURI(modelPath);
+		ResourceSet resourceSet = new ResourceSetImpl();
+		resourceSet.getPackageRegistry().put(UMLPackage.eNS_URI, UMLPackage.eINSTANCE);
+		resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put(UMLResource.FILE_EXTENSION, UMLResource.Factory.INSTANCE);
+		resourceSet.createResource(modelUri);
+		return resourceSet.getResource(modelUri, true);
 	}
 
 	/**
@@ -123,12 +148,67 @@ public abstract class UmlUtils {
 		Action<String, String> action = null;
 		if (transition.getEffect() instanceof OpaqueBehavior) {
 			String beanId = UmlUtils.resolveBodyByLanguage(UmlModelParser.LANGUAGE_BEAN, (OpaqueBehavior)transition.getEffect());
-			Action<String, String> bean = resolver.resolveAction(beanId);
-			if (bean != null) {
-				action = bean;
+			if (StringUtils.hasText(beanId)) {
+				Action<String, String> bean = resolver.resolveAction(beanId);
+				if (bean != null) {
+					action = bean;
+				}
+			} else {
+				String expression = UmlUtils.resolveBodyByLanguage(UmlModelParser.LANGUAGE_SPEL, (OpaqueBehavior)transition.getEffect());
+				if (StringUtils.hasText(expression)) {
+					SpelExpressionParser parser = new SpelExpressionParser(
+							new SpelParserConfiguration(SpelCompilerMode.MIXED, null));
+					action = new SpelExpressionAction<String, String>(parser.parseExpression(expression));
+				}
 			}
 		}
 		return action;
+	}
+
+	/**
+	 * Resolve transition actions.
+	 *
+	 * @param transition the transition
+	 * @param resolver the state machine component resolver
+	 * @return the collection of actions
+	 */
+	public static Collection<Function<StateContext<String, String>, Mono<Void>>> resolveTransitionActionFunctions(
+			Transition transition, StateMachineComponentResolver<String, String> resolver) {
+		ArrayList<Function<StateContext<String, String>, Mono<Void>>> actions = new ArrayList<>();
+		Function<StateContext<String, String>, Mono<Void>> action = resolveTransitionActionFunction(transition, resolver);
+		if (action != null) {
+			actions.add(action);
+		}
+		return actions;
+	}
+
+	/**
+	 * Resolve transition action or null if no action was found.
+	 *
+	 * @param transition the transition
+	 * @param resolver the state machine component resolver
+	 * @return the action
+	 */
+	public static Function<StateContext<String, String>, Mono<Void>> resolveTransitionActionFunction(Transition transition,
+			StateMachineComponentResolver<String, String> resolver) {
+		Action<String, String> action = null;
+		if (transition.getEffect() instanceof OpaqueBehavior) {
+			String beanId = UmlUtils.resolveBodyByLanguage(UmlModelParser.LANGUAGE_BEAN, (OpaqueBehavior)transition.getEffect());
+			if (StringUtils.hasText(beanId)) {
+				Action<String, String> bean = resolver.resolveAction(beanId);
+				if (bean != null) {
+					action = bean;
+				}
+			} else {
+				String expression = UmlUtils.resolveBodyByLanguage(UmlModelParser.LANGUAGE_SPEL, (OpaqueBehavior)transition.getEffect());
+				if (StringUtils.hasText(expression)) {
+					SpelExpressionParser parser = new SpelExpressionParser(
+							new SpelParserConfiguration(SpelCompilerMode.MIXED, null));
+					action = new SpelExpressionAction<String, String>(parser.parseExpression(expression));
+				}
+			}
+		}
+		return Actions.from(action);
 	}
 
 	/**

@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,13 @@
  */
 package org.springframework.statemachine.trigger;
 
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
-import org.springframework.statemachine.support.CountTrigger;
 import org.springframework.statemachine.support.LifecycleObjectSupport;
+
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Implementation of a {@link Trigger} capable of firing on a
@@ -35,7 +37,7 @@ public class TimerTrigger<S, E> extends LifecycleObjectSupport implements Trigge
 	private final CompositeTriggerListener triggerListener = new CompositeTriggerListener();
 	private final long period;
 	private final int count;
-	private volatile ScheduledFuture<?> scheduled;
+	private Disposable disposable;
 
 	/**
 	 * Instantiates a new timer trigger.
@@ -57,9 +59,17 @@ public class TimerTrigger<S, E> extends LifecycleObjectSupport implements Trigge
 		this.count = count;
 	}
 
+	public long getPeriod() {
+		return period;
+	}
+
+	public int getCount() {
+		return count;
+	}
+
 	@Override
-	public boolean evaluate(TriggerContext<S, E> context) {
-		return false;
+	public Mono<Boolean> evaluate(TriggerContext<S, E> context) {
+		return Mono.just(false);
 	}
 
 	@Override
@@ -73,21 +83,26 @@ public class TimerTrigger<S, E> extends LifecycleObjectSupport implements Trigge
 	}
 
 	@Override
-	protected void doStart() {
-		if (count > 0) {
-			return;
-		}
-		schedule();
+	protected Mono<Void> doPreStartReactively() {
+		return Mono.defer(() -> {
+			if (count > 0) {
+				return Mono.empty();
+			}
+			return Mono.fromRunnable(() -> schedule());
+		});
 	}
 
 	@Override
-	protected void doStop() {
-		cancel();
+	protected Mono<Void> doPreStopReactively() {
+		return Mono.defer(() -> {
+			cancel();
+			return Mono.empty();
+		});
 	}
 
 	@Override
 	public void arm() {
-		if (scheduled != null) {
+		if (disposable != null) {
 			return;
 		}
 		schedule();
@@ -102,13 +117,14 @@ public class TimerTrigger<S, E> extends LifecycleObjectSupport implements Trigge
 
 	private void schedule() {
 		long initialDelay = count > 0 ? period : 0;
-		scheduled = getTaskScheduler().schedule(new Runnable() {
-
-			@Override
-			public void run() {
+		Flux<Long> interval = Flux.interval(Duration.ofMillis(initialDelay), Duration.ofMillis(period))
+			.doOnNext(c -> {
 				notifyTriggered();
-			}
-		}, new CountTrigger(count, period, initialDelay, TimeUnit.MILLISECONDS));
+			});
+		if (count > 0) {
+			interval = interval.take(count);
+		}
+		disposable = interval.subscribe();
 	}
 
 	private void notifyTriggered() {
@@ -116,9 +132,9 @@ public class TimerTrigger<S, E> extends LifecycleObjectSupport implements Trigge
 	}
 
 	private void cancel() {
-		if (scheduled != null) {
-			scheduled.cancel(true);
+		if (disposable != null) {
+			disposable.dispose();
 		}
-		scheduled = null;
+		disposable = null;
 	}
 }

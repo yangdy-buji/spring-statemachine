@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,8 @@
  */
 package org.springframework.statemachine.config;
 
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.sameInstance;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,16 +24,15 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.ObjectStateMachine;
 import org.springframework.statemachine.StateMachine;
@@ -70,14 +65,14 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testStates() {
 		context.register(Config1.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 		TestAction testAction = context.getBean("testAction", TestAction.class);
 		TestGuard testGuard = context.getBean("testGuard", TestGuard.class);
-		assertThat(testAction, notNullValue());
-		assertThat(testGuard, notNullValue());
+		assertThat(testAction).isNotNull();
+		assertThat(testGuard).isNotNull();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -85,10 +80,10 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testSimpleSubmachine() throws Exception {
 		context.register(Config4.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -96,10 +91,10 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testRegions() throws Exception {
 		context.register(Config6.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -107,10 +102,10 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testSubmachineWithState() throws Exception {
 		context.register(Config7.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -118,10 +113,10 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testSubmachineWithRegion() throws Exception {
 		context.register(Config8.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine, notNullValue());
+		assertThat(machine).isNotNull();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -131,8 +126,8 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine.isAutoStartup(), is(true));
-		assertThat(machine.isRunning(), is(true));
+		assertThat(machine.isAutoStartup()).isTrue();
+		assertThat(machine.isRunning()).isTrue();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -142,8 +137,8 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		context.refresh();
 		ObjectStateMachine<TestStates,TestEvents> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
-		assertThat(machine.isAutoStartup(), is(false));
-		assertThat(machine.isRunning(), is(false));
+		assertThat(machine.isAutoStartup()).isFalse();
+		assertThat(machine.isRunning()).isFalse();
 	}
 
 	@SuppressWarnings({ "unchecked" })
@@ -156,7 +151,7 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		Object o1 = TestUtils.readField("stateListener", machine);
 		Object o2 = TestUtils.readField("listeners", o1);
 		Object o3 = TestUtils.readField("list", o2);
-		assertThat(((List<?>)o3).size(), is(2));
+		assertThat(((List<?>)o3)).hasSize(2);
 	}
 
 	@Test
@@ -165,70 +160,12 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		context.refresh();
 	}
 
-	@Test(expected = BeanCreationException.class)
+	@Test
 	public void testEnableStateMachineFactoryNoAdapter() {
-		context.register(Config13.class);
-		context.refresh();
-	}
-
-	@Test
-	public void testTaskExecutor1() throws Exception {
-		// set in builder, no bf or taskExecutor bean registered
-		context.register(Config14.class);
-		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
-
-		Object executorFromMachine = TestUtils.readField("taskExecutor", stateMachine);
-		Object stateMachineExecutor = TestUtils.readField("stateMachineExecutor", stateMachine);
-		Object executorFromExecutor = TestUtils.readField("taskExecutor", stateMachineExecutor);
-
-		assertThat(executorFromMachine, sameInstance(Config14.taskExecutor));
-		assertThat(executorFromExecutor, sameInstance(Config14.taskExecutor));
-
-		assertThat(executorFromMachine, notNullValue());
-		assertThat(executorFromExecutor, notNullValue());
-		assertThat(executorFromMachine, sameInstance(executorFromExecutor));
-	}
-
-	@Test
-	public void testTaskExecutor2() throws Exception {
-		// set as bean, should get from bf
-		context.register(BaseConfig.class, Config15.class);
-		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
-		assertThat(context.containsBean(StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME), is(true));
-
-		Object stateMachineExecutor = TestUtils.readField("stateMachineExecutor", stateMachine);
-
-		Object executorFromMachine = TestUtils.callMethod("getTaskExecutor", stateMachine);
-		Object executorFromExecutor = TestUtils.callMethod("getTaskExecutor", stateMachineExecutor);
-
-		assertThat(executorFromMachine, notNullValue());
-		assertThat(executorFromExecutor, notNullValue());
-		assertThat(executorFromMachine, sameInstance(executorFromExecutor));
-	}
-
-	@Test
-	public void testTaskExecutor3() throws Exception {
-		// override task execution via configurer
-		context.register(Config19.class);
-		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
-		assertThat(context.containsBean(StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME), is(true));
-
-		Object stateMachineExecutor = TestUtils.readField("stateMachineExecutor", stateMachine);
-
-		Object executorFromMachine = TestUtils.callMethod("getTaskExecutor", stateMachine);
-		Object executorFromExecutor = TestUtils.callMethod("getTaskExecutor", stateMachineExecutor);
-
-		assertThat(executorFromMachine, notNullValue());
-		assertThat(executorFromExecutor, notNullValue());
-		assertThat(executorFromMachine, sameInstance(executorFromExecutor));
-
-		assertThat(executorFromMachine, instanceOf(ThreadPoolTaskExecutor.class));
+		assertThatThrownBy(() -> {
+			context.register(Config13.class);
+			context.refresh();
+		}).isInstanceOf(BeanCreationException.class);
 	}
 
 	@Test
@@ -244,9 +181,9 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		Object bfFromMachine = TestUtils.callMethod("getBeanFactory", stateMachine);
 		Object bfFromExecutor = TestUtils.callMethod("getBeanFactory", stateMachineExecutor);
 
-		assertThat(bfFromMachine, notNullValue());
-		assertThat(bfFromExecutor, notNullValue());
-		assertThat(bfFromMachine, sameInstance(bfFromExecutor));
+		assertThat(bfFromMachine).isNotNull();
+		assertThat(bfFromExecutor).isNotNull();
+		assertThat(bfFromMachine).isSameAs(bfFromExecutor);
 	}
 
 	@Test
@@ -262,9 +199,9 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		Object bfFromMachine = TestUtils.callMethod("getBeanFactory", stateMachine);
 		Object bfFromExecutor = TestUtils.callMethod("getBeanFactory", stateMachineExecutor);
 
-		assertThat(bfFromMachine, notNullValue());
-		assertThat(bfFromExecutor, notNullValue());
-		assertThat(bfFromMachine, sameInstance(Config16.beanFactory));
+		assertThat(bfFromMachine).isNotNull();
+		assertThat(bfFromExecutor).isNotNull();
+		assertThat(bfFromMachine).isSameAs(Config16.beanFactory);
 	}
 
 	@Test
@@ -273,8 +210,8 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		context.refresh();
 		@SuppressWarnings("unchecked")
 		StateMachine<String, String> stateMachine = context.getBean(StateMachine.class);
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), is("testid1"));
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isEqualTo("testid1");
 	}
 
 	@Test
@@ -284,12 +221,12 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		@SuppressWarnings("unchecked")
 		StateMachineFactory<String, String> stateMachineFactory = context.getBean(StateMachineFactory.class);
 		StateMachine<String,String> stateMachine = stateMachineFactory.getStateMachine();
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), is("testid1"));
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isEqualTo("testid1");
 
 		stateMachine = stateMachineFactory.getStateMachine("testid2");
-		assertThat(stateMachine, notNullValue());
-		assertThat(stateMachine.getId(), is("testid2"));
+		assertThat(stateMachine).isNotNull();
+		assertThat(stateMachine.getId()).isEqualTo("testid2");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -297,22 +234,35 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 	public void testMultipleEndStates() {
 		context.register(Config20.class);
 		context.refresh();
-		assertTrue(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE));
+		assertThat(context.containsBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE)).isTrue();
 		ObjectStateMachine<String, String> machine =
 				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, ObjectStateMachine.class);
 
 		Collection<State<String, String>> states = machine.getStates();
 		for (State<String, String> s : states) {
 			if (s.getId().equals("S3")) {
-				assertThat(s.getPseudoState(), notNullValue());
-				assertThat(s.getPseudoState().getKind(), is(PseudoStateKind.END));
+				assertThat(s.getPseudoState()).isNotNull();
+				assertThat(s.getPseudoState().getKind()).isEqualTo(PseudoStateKind.END);
 			}
 			if (s.getId().equals("S2")) {
-				assertThat(s.getPseudoState(), notNullValue());
-				assertThat(s.getPseudoState().getKind(), is(PseudoStateKind.END));
+				assertThat(s.getPseudoState()).isNotNull();
+				assertThat(s.getPseudoState().getKind()).isEqualTo(PseudoStateKind.END);
 			}
 		}
 	}
+
+	@Test
+	public void testMachinesWithDependenciesAndConstructorInjection() {
+		context.register(Config21.class);
+		context.register(Config22.class);
+		context.refresh();
+		@SuppressWarnings("unchecked")
+		StateMachineFactory<String, String> stateMachineFactory22 = context.getBean("stateMachineConfig22", StateMachineFactory.class);
+		StateMachine<String,String> stateMachine22 = stateMachineFactory22.getStateMachine();
+		assertThat(stateMachine22).isNotNull();
+	}
+
+
 
 	@Configuration
 	@EnableStateMachine
@@ -349,12 +299,6 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		public TestGuard testGuard() {
 			return new TestGuard();
 		}
-
-		@Bean
-		public TaskExecutor taskExecutor() {
-			return new SyncTaskExecutor();
-		}
-
 	}
 
 	@Configuration
@@ -727,16 +671,12 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 
 	@Configuration
 	public static class Config14 {
-
-		public static TaskExecutor taskExecutor = new SyncTaskExecutor();
-
 		@Bean
 		StateMachine<String, String> stateMachine() throws Exception {
 			Builder<String, String> builder = StateMachineBuilder.builder();
 			builder.configureConfiguration()
 				.withConfiguration()
-					.autoStartup(false)
-					.taskExecutor(taskExecutor);
+					.autoStartup(false);
 			builder.configureStates()
 				.withStates()
 					.initial("S1").state("S2");
@@ -869,7 +809,6 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 		public void configure(StateMachineConfigurationConfigurer<String, String> config) throws Exception {
 			config
 				.withConfiguration()
-					.taskExecutor(taskExecutor())
 					.autoStartup(true);
 		}
 
@@ -889,16 +828,60 @@ public class ConfigurationTests extends AbstractStateMachineTests {
 					.target("S2")
 					.event("E1");
 		}
-
-		@Bean(name = "fakeBeanName")
-		public TaskExecutor taskExecutor() {
-			return new ThreadPoolTaskExecutor();
-		}
 	}
 
 	@Configuration
 	@EnableStateMachine
 	public static class Config20 extends StateMachineConfigurerAdapter<String, String> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("S1")
+					.end("S2")
+					.end("S3");
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("S1")
+					.target("S2")
+					.event("E1");
+		}
+	}
+
+	@Configuration
+	@EnableStateMachineFactory(name="stateMachineConfig21")
+	public static class Config21 extends StateMachineConfigurerAdapter<String, String> {
+		@Override
+		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {
+			states
+				.withStates()
+					.initial("S1")
+					.end("S2")
+					.end("S3");
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<String, String> transitions) throws Exception {
+			transitions
+				.withExternal()
+					.source("S1")
+					.target("S2")
+					.event("E1");
+		}
+	}
+
+
+	@Configuration
+	@EnableStateMachineFactory(name="stateMachineConfig22")
+	public static class Config22 extends StateMachineConfigurerAdapter<String, String> {
+		@Autowired
+		Config22(@Qualifier("stateMachineConfig21") StateMachineFactory<String, String> otherStateMachine) {
+		}
 
 		@Override
 		public void configure(StateMachineStateConfigurer<String, String> states) throws Exception {

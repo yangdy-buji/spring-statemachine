@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,9 +50,10 @@ public interface StateMachineInterceptor<S, E> {
 	 * @param message the message
 	 * @param transition the transition
 	 * @param stateMachine the state machine
+	 * @param rootStateMachine the root state machine
 	 */
 	void preStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-			StateMachine<S, E> stateMachine);
+			StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine);
 
 	/**
 	 * Called after a state change.
@@ -61,9 +62,10 @@ public interface StateMachineInterceptor<S, E> {
 	 * @param message the message
 	 * @param transition the transition
 	 * @param stateMachine the state machine
+	 * @param rootStateMachine the root state machine
 	 */
 	void postStateChange(State<S, E> state, Message<E> message, Transition<S, E> transition,
-			StateMachine<S, E> stateMachine);
+			StateMachine<S, E> stateMachine, StateMachine<S, E> rootStateMachine);
 
 	/**
 	 * Called prior of a start of a transition. Returning

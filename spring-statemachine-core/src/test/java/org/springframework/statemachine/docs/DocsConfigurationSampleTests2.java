@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,29 +15,28 @@
  */
 package org.springframework.statemachine.docs;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.StateMachineBuilder;
@@ -53,6 +52,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+import reactor.core.publisher.Mono;
 
 public class DocsConfigurationSampleTests2 extends AbstractStateMachineTests {
 
@@ -122,8 +123,7 @@ public class DocsConfigurationSampleTests2 extends AbstractStateMachineTests {
 			Builder<String, String> builder = StateMachineBuilder.builder();
 			builder.configureConfiguration()
 				.withConfiguration()
-					.autoStartup(true)
-					.taskExecutor(new SyncTaskExecutor());
+					.autoStartup(true);
 			builder.configureStates()
 				.withStates()
 					.initial("S1")
@@ -182,7 +182,10 @@ public class DocsConfigurationSampleTests2 extends AbstractStateMachineTests {
 
 		@RequestMapping(path="/state", method=RequestMethod.POST)
 		public HttpEntity<Void> setState(@RequestParam("event") String event) {
-			stateMachine.sendEvent(event);
+			stateMachine
+				.sendEvent(Mono.just(MessageBuilder
+					.withPayload(event).build()))
+				.subscribe();
 			return new ResponseEntity<Void>(HttpStatus.ACCEPTED);
 		}
 
@@ -196,89 +199,74 @@ public class DocsConfigurationSampleTests2 extends AbstractStateMachineTests {
 
 	@Test
 	public void testConfig51() throws Exception {
-		context.register(Config5.class, ExecutorConfig.class);
+		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(1);
 		listener.reset(0, 0, 2);
-		machine.sendEvent("DEPLOY");
-		machine.sendEvent("DEPLOY");
-		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(2);
 	}
 
 	@Test
 	public void testConfig52() throws Exception {
 		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(1);
 		listener.reset(0, 0, 2);
-		machine.sendEvent("DEPLOY");
-		machine.sendEvent("DEPLOY");
-		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(2);
 	}
 
 	@Test
 	public void testConfig61() throws Exception {
-		context.register(Config6.class, ExecutorConfig.class);
+		context.register(Config6.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(1);
 		listener.reset(0, 0, 2);
-		machine.sendEvent("DEPLOY");
-		machine.sendEvent("DEPLOY");
-		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(2);
 	}
 
 	@Test
 	public void testConfig62() throws Exception {
 		context.register(Config6.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<String, String> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<String, String> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
-		machine.start();
-		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(1));
+		doStartAndAssert(machine);
+		assertThat(listener.stateMachineStartedLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredLatch.await(3, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(1);
 		listener.reset(0, 0, 2);
-		machine.sendEvent("DEPLOY");
-		machine.sendEvent("DEPLOY");
-		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.readyStateEnteredCount, is(2));
-	}
-
-	@Configuration
-	static class ExecutorConfig {
-
-		@Bean(name=StateMachineSystemConstants.TASK_EXECUTOR_BEAN_NAME)
-		public TaskExecutor taskExecutor() {
-			ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
-			taskExecutor.setCorePoolSize(1);
-			return taskExecutor;
-		}
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		doSendEventAndConsumeAll(machine, "DEPLOY");
+		assertThat(listener.readyStateEnteredLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.readyStateEnteredCount).isEqualTo(2);
 	}
 
 // tag::snippetE[]

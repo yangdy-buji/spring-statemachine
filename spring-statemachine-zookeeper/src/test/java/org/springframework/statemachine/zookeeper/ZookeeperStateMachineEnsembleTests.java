@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,8 @@
  */
 package org.springframework.statemachine.zookeeper;
 
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,12 +28,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.zookeeper.KeeperException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
+import org.springframework.statemachine.StateMachineEventResult;
 import org.springframework.statemachine.StateMachineException;
 import org.springframework.statemachine.access.StateMachineAccessor;
 import org.springframework.statemachine.ensemble.EnsembleListener;
@@ -47,6 +44,9 @@ import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.DefaultExtendedState;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.statemachine.transition.Transition;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 
@@ -63,8 +63,8 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 
 		ensemble.afterPropertiesSet();
 
-		assertThat(curatorClient.checkExists().forPath("/foo/data/current"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log"), notNullValue());
+		assertThat(curatorClient.checkExists().forPath("/foo/data/current")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log")).isNotNull();
 
 		ensemble.start();
 	}
@@ -82,11 +82,11 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 
 		ensemble.afterPropertiesSet();
 
-		assertThat(curatorClient.checkExists().forPath("/foo/data/current"), notNullValue());
-		assertThat(curatorClient.getData().forPath("/foo/data/current").length, is(0));
+		assertThat(curatorClient.checkExists().forPath("/foo/data/current")).isNotNull();
+		assertThat(curatorClient.getData().forPath("/foo/data/current")).isEmpty();
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S1","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/current").length, greaterThan(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/current").length).isGreaterThan(0);
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S2","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
 	}
@@ -109,16 +109,16 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble1.start();
 		ensemble2.start();
 
-		assertThat(curatorClient.checkExists().forPath("/foo/data/current"), notNullValue());
-		assertThat(curatorClient.getData().forPath("/foo/data/current").length, is(0));
+		assertThat(curatorClient.checkExists().forPath("/foo/data/current")).isNotNull();
+		assertThat(curatorClient.getData().forPath("/foo/data/current")).isEmpty();
 
 		ensemble1.setState(new DefaultStateMachineContext<String, String>("S1","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/current").length, greaterThan(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/current").length).isGreaterThan(0);
 
 		StateMachineContext<String, String> context = ensemble2.getState();
-		assertThat(context, notNullValue());
-		assertThat(context.getState(), is("S1"));
-		assertThat(context.getEvent(), is("E1"));
+		assertThat(context).isNotNull();
+		assertThat(context.getState()).isEqualTo("S1");
+		assertThat(context.getEvent()).isEqualTo("E1");
 	}
 
 	@Test
@@ -149,11 +149,11 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 
 		ensemble1.join(stateMachine1);
 		ensemble2.join(stateMachine2);
-		assertThat(listener1.joinedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.joinedLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.joinedLatch.await(2, TimeUnit.SECONDS)).isTrue();
 
 		ensemble1.setState(new DefaultStateMachineContext<String, String>("S1", "E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(listener2.eventLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.eventLatch.await(2, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@Test
@@ -174,7 +174,7 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble1.start();
 
 		// we assume that if data is 0, it's re-created
-		assertThat(curatorClient.getData().forPath("/foo/data/log").length, is(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/log")).isEmpty();
 	}
 
 	@Test
@@ -191,45 +191,47 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble.afterPropertiesSet();
 		ensemble.start();
 
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log/0"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log/1"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log/2"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log/3"), notNullValue());
-		assertThat(curatorClient.checkExists().forPath("/foo/data/log/4"), nullValue());
-		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length, is(0));
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log/0")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log/1")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log/2")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log/3")).isNotNull();
+		assertThat(curatorClient.checkExists().forPath("/foo/data/log/4")).isNull();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/0")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/1")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/2")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/3")).isEmpty();
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S1","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length, is(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/1")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/2")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/3")).isEmpty();
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S2","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length, is(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length, is(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/2")).isEmpty();
+		assertThat(curatorClient.getData().forPath("/foo/data/log/3")).isEmpty();
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S3","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length, is(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/3")).isEmpty();
 
 		ensemble.setState(new DefaultStateMachineContext<String, String>("S4","E1", new HashMap<String, Object>(), new DefaultExtendedState()));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length, greaterThan(0));
-		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length, greaterThan(0));
+		assertThat(curatorClient.getData().forPath("/foo/data/log/0").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/1").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/2").length).isGreaterThan(0);
+		assertThat(curatorClient.getData().forPath("/foo/data/log/3").length).isGreaterThan(0);
 	}
 
-	@Test(expected = IllegalStateException.class)
+	@Test
 	public void testIllegalLogSize() throws Exception {
-				new ZookeeperStateMachineEnsemble<String, String>(null, "/foo", true, 3);
+		assertThatThrownBy(() -> {
+			new ZookeeperStateMachineEnsemble<String, String>(null, "/foo", true, 3);
+		}).isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
@@ -248,7 +250,7 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble.afterPropertiesSet();
 		ensemble.start();
 		ensemble.join(new TestStateMachine());
-		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener.reset(0, 10);
 
@@ -257,11 +259,11 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
 
-		assertThat(listener.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener.events.size(), is(10));
+		assertThat(listener.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.events).hasSize(10);
 
 		for (int i = 0; i < 10; i++) {
-			assertThat(listener.events.get(i).getEvent(), is("E" + i));
+			assertThat(listener.events.get(i).getEvent()).isEqualTo("E" + i);
 		}
 	}
 
@@ -289,9 +291,9 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble2.start();
 
 		ensemble1.join(new TestStateMachine());
-		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 		ensemble2.join(new TestStateMachine());
-		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener1.reset(0, 10);
 		listener2.reset(0, 10);
@@ -301,14 +303,14 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
 
-		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.events.size(), is(10));
-		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.events.size(), is(10));
+		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.events).hasSize(10);
+		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.events).hasSize(10);
 
 		for (int i = 0; i < 10; i++) {
-			assertThat(listener1.events.get(i).getEvent(), is("E" + i));
-			assertThat(listener2.events.get(i).getEvent(), is("E" + i));
+			assertThat(listener1.events.get(i).getEvent()).isEqualTo("E" + i);
+			assertThat(listener2.events.get(i).getEvent()).isEqualTo("E" + i);
 		}
 	}
 
@@ -336,9 +338,9 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble2.start();
 
 		ensemble1.join(new TestStateMachine());
-		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 		ensemble2.join(new TestStateMachine());
-		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener1.reset(0, 10);
 		listener2.reset(0, 10);
@@ -359,18 +361,18 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		}
 
 		if (e != null) {
-			assertThat(e, instanceOf(StateMachineException.class));
-			assertThat(((StateMachineException)e).contains(KeeperException.BadVersionException.class), is(true));
+			assertThat(e).isInstanceOf(StateMachineException.class);
+			assertThat(((StateMachineException)e).contains(KeeperException.BadVersionException.class)).isTrue();
 		} else {
 			// miracle happened and no cas error, well then check events
-			assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-			assertThat(listener1.events.size(), is(10));
-			assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-			assertThat(listener2.events.size(), is(10));
+			assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+			assertThat(listener1.events).hasSize(10);
+			assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+			assertThat(listener2.events).hasSize(10);
 
 			for (int i = 0; i < 10; i++) {
-				assertThat(listener1.events.get(i).getEvent(), is("E" + i));
-				assertThat(listener2.events.get(i).getEvent(), is("E" + i));
+				assertThat(listener1.events.get(i).getEvent()).isEqualTo("E" + i);
+				assertThat(listener2.events.get(i).getEvent()).isEqualTo("E" + i);
 			}
 		}
 	}
@@ -399,9 +401,9 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble2.start();
 
 		ensemble1.join(new TestStateMachine());
-		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 		ensemble2.join(new TestStateMachine());
-		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		for (int i = 0; i < 10; i++) {
 			listener1.reset(0, 1);
@@ -413,10 +415,10 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 				ensemble2.setState(new DefaultStateMachineContext<String, String>("S" + i, "E" + i,
 						new HashMap<String, Object>(), new DefaultExtendedState()));
 			}
-			assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-			assertThat(listener1.events.size(), is(1));
-			assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-			assertThat(listener2.events.size(), is(1));
+			assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+			assertThat(listener1.events).hasSize(1);
+			assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+			assertThat(listener2.events).hasSize(1);
 		}
 	}
 
@@ -438,7 +440,7 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble.start();
 
 		ensemble.join(new TestStateMachine());
-		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener.reset(0, 10);
 
@@ -448,11 +450,11 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 			Thread.sleep(500);
 		}
 
-		assertThat(listener.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener.events.size(), is(10));
+		assertThat(listener.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.events).hasSize(10);
 
 		for (int i = 0; i < 10; i++) {
-			assertThat(listener.events.get(i).getEvent(), is("E" + i));
+			assertThat(listener.events.get(i).getEvent()).isEqualTo("E" + i);
 		}
 	}
 
@@ -480,9 +482,9 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble2.start();
 
 		ensemble1.join(new TestStateMachine());
-		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 		ensemble2.join(new TestStateMachine());
-		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener1.reset(0, 10);
 		listener2.reset(0, 10);
@@ -493,14 +495,14 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 			Thread.sleep(500);
 		}
 
-		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.events.size(), is(10));
-		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.events.size(), is(10));
+		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.events).hasSize(10);
+		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.events).hasSize(10);
 
 		for (int i = 0; i < 10; i++) {
-			assertThat(listener1.events.get(i).getEvent(), is("E" + i));
-			assertThat(listener2.events.get(i).getEvent(), is("E" + i));
+			assertThat(listener1.events.get(i).getEvent()).isEqualTo("E" + i);
+			assertThat(listener2.events.get(i).getEvent()).isEqualTo("E" + i);
 		}
 	}
 
@@ -528,9 +530,9 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble2.start();
 
 		ensemble1.join(new TestStateMachine());
-		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener1.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 		ensemble2.join(new TestStateMachine());
-		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener2.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener1.reset(0, 9);
 		listener2.reset(0, 9);
@@ -540,14 +542,14 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
 
-		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.events.size(), is(9));
-		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.events.size(), is(9));
+		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.events).hasSize(9);
+		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.events).hasSize(9);
 
 		for (int i = 0; i < 9; i++) {
-			assertThat(listener1.events.get(i).getEvent(), is("E" + i));
-			assertThat(listener2.events.get(i).getEvent(), is("E" + i));
+			assertThat(listener1.events.get(i).getEvent()).isEqualTo("E" + i);
+			assertThat(listener2.events.get(i).getEvent()).isEqualTo("E" + i);
 		}
 
 		listener1.reset(0, 1);
@@ -559,14 +561,14 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
 
-		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener1.events.size(), is(1));
-		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS), is(true));
-		assertThat(listener2.events.size(), is(1));
+		assertThat(listener1.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener1.events).hasSize(1);
+		assertThat(listener2.eventLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener2.events).hasSize(1);
 
 		for (int i = 0; i < 1; i++) {
-			assertThat(listener1.events.get(i).getEvent(), is("E" + (i+9)));
-			assertThat(listener2.events.get(i).getEvent(), is("E" + (i+9)));
+			assertThat(listener1.events.get(i).getEvent()).isEqualTo("E" + (i+9));
+			assertThat(listener2.events.get(i).getEvent()).isEqualTo("E" + (i+9));
 		}
 	}
 
@@ -586,7 +588,7 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		ensemble.start();
 
 		ensemble.join(new TestStateMachine());
-		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS), is(true));
+		assertThat(listener.joinedLatch.await(3, TimeUnit.SECONDS)).isTrue();
 
 		listener.reset(0, 10, 1);
 
@@ -599,7 +601,7 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 			ensemble.setState(new DefaultStateMachineContext<String, String>("S" + i, "E" + i,
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
-		assertThat(listener.errorLatch.await(2, TimeUnit.SECONDS), is(false));
+		assertThat(listener.errorLatch.await(2, TimeUnit.SECONDS)).isFalse();
 
 		ensemble.enabled = true;
 
@@ -609,14 +611,14 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		if (listener.errors.size() > 0) {
 			reason = listener.errors.get(0).toString();
 		}
-		assertThat(reason, listener.errors.size(), is(0));
+		assertThat(listener.errors).withFailMessage(reason).isEmpty();
 
 		// this should actually cause ensemble to fail
 		for (int i = 10; i < 11; i++) {
 			ensemble.setState(new DefaultStateMachineContext<String, String>("S" + i, "E" + i,
 					new HashMap<String, Object>(), new DefaultExtendedState()));
 		}
-		assertThat(listener.errorLatch.await(2, TimeUnit.SECONDS), is(true));
+		assertThat(listener.errorLatch.await(2, TimeUnit.SECONDS)).isTrue();
 	}
 
 	private class OverflowControlZookeeperStateMachineEnsemble extends ZookeeperStateMachineEnsemble<String, String> {
@@ -701,21 +703,50 @@ public class ZookeeperStateMachineEnsembleTests extends AbstractZookeeperTests {
 		}
 
 		@Override
+		public Mono<Void> startReactively() {
+			return null;
+		}
+
+		@Override
+		public Mono<Void> stopReactively() {
+			return null;
+		}
+
+		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void start() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public void stop() {
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(Message<String> event) {
 			return false;
 		}
 
 		@Override
+		@SuppressWarnings({"all", "deprecation"})
 		public boolean sendEvent(String event) {
 			return false;
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<String, String>> sendEvent(Mono<Message<String>> event) {
+			return null;
+		}
+
+		@Override
+		public Mono<List<StateMachineEventResult<String, String>>> sendEventCollect(Mono<Message<String>> event) {
+			return null;
+		}
+
+		@Override
+		public Flux<StateMachineEventResult<String, String>> sendEvents(Flux<Message<String>> events) {
+			return null;
 		}
 
 		@Override

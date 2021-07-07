@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,28 +15,27 @@
  */
 package org.springframework.statemachine.annotation;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveFactory;
 
 import java.util.EnumSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
 import org.springframework.statemachine.config.EnableStateMachineFactory;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
 
-@SuppressWarnings("unchecked")
 public class MethodAnnotationWithFactoryTests extends AbstractStateMachineTests {
 
 	@Test
@@ -46,15 +45,14 @@ public class MethodAnnotationWithFactoryTests extends AbstractStateMachineTests 
 
 		Bean1 bean1 = context.getBean(Bean1.class);
 
-		StateMachineFactory<TestStates,TestEvents> factory =
-				context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINEFACTORY, StateMachineFactory.class);
+		StateMachineFactory<TestStates,TestEvents> factory = resolveFactory(context);
 		StateMachine<TestStates,TestEvents> machine = factory.getStateMachine("xxx");
-		machine.start();
+		doStartAndAssert(machine);
 
-		assertThat(machine.getState().getIds(), contains(TestStates.S1));
-		machine.sendEvent(TestEvents.E1);
-		assertThat(machine.getState().getIds(), contains(TestStates.S2));
-		assertThat(bean1.onStateChangedLatch.await(1, TimeUnit.SECONDS), is(true));
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S1);
+		doSendEventAndConsumeAll(machine, TestEvents.E1);
+		assertThat(machine.getState().getIds()).containsExactly(TestStates.S2);
+		assertThat(bean1.onStateChangedLatch.await(1, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@WithStateMachine(name = "xxx")

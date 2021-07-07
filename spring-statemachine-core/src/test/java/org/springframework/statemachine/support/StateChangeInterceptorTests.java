@@ -1,11 +1,11 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,17 @@
  */
 package org.springframework.statemachine.support;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.statemachine.TestUtils.doSendEventAndConsumeAll;
+import static org.springframework.statemachine.TestUtils.doStartAndAssert;
+import static org.springframework.statemachine.TestUtils.resolveMachine;
 
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,9 +34,6 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.AbstractStateMachineTests;
 import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.StateMachineSystemConstants;
-import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
@@ -57,231 +55,227 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 	public void testIntercept() throws InterruptedException {
 		context.register(Config1.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
-
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
 
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S1, States.S11));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S1, States.S11);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isZero();
 
 		listener.reset(3);
 		interceptor.reset(1);
-		machine.sendEvent(Events.C);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(3));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S2, States.S21, States.S211));
-		machine.sendEvent(Events.H);
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0, States.S2, States.S21, States.S211));
-		assertThat((Integer)machine.getExtendedState().getVariables().get("foo"), is(1));
+		doSendEventAndConsumeAll(machine, Events.C);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(3);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S2, States.S21, States.S211);
+		doSendEventAndConsumeAll(machine, Events.H);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0, States.S2, States.S21, States.S211);
+		assertThat((Integer)machine.getExtendedState().getVariables().get("foo")).isEqualTo(1);
 	}
 
 	@Test
 	public void testIntercept2() throws InterruptedException {
 		context.register(Config2.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
-
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.B);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S2));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
+		doSendEventAndConsumeAll(machine, Events.B);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
+
+		interceptor.reset(1);
+		listener.reset(1);
+		doSendEventAndConsumeAll(machine, Events.C);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
 	}
 
 	@Test
 	public void testIntercept3() throws InterruptedException {
 		context.register(Config3.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
-
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S2));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
 	}
 
 	@Test
 	public void testIntercept4() throws InterruptedException {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
-
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S2));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
-		assertThat(interceptor.postStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.postStateChangeCount, is(1));
-		assertThat(interceptor.preStateChangeStates.size(), is(1));
-		assertThat(interceptor.postStateChangeStates.size(), is(1));
-		assertThat(interceptor.preStateChangeStates.get(0).getId(), is(interceptor.postStateChangeStates.get(0).getId()));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
+		assertThat(interceptor.postStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.postStateChangeCount2).isEqualTo(1);
+		assertThat(interceptor.preStateChangeStates2).hasSize(1);
+		assertThat(interceptor.postStateChangeStates2).hasSize(1);
+		assertThat(interceptor.preStateChangeStates2.get(0).getId()).isEqualTo(interceptor.postStateChangeStates2.get(0).getId());
 	}
 
 	@Test
 	public void testIntercept5() throws InterruptedException {
 		context.register(Config4.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
-
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(MessageBuilder.withPayload(Events.A).setHeader("test", "exists").build());
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S3));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
-		assertThat(interceptor.postStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.postStateChangeCount, is(1));
-		assertThat(interceptor.preStateChangeStates.size(), is(1));
-		assertThat(interceptor.postStateChangeStates.size(), is(1));
-		assertThat(interceptor.preStateChangeStates.get(0).getId(), is(interceptor.postStateChangeStates.get(0).getId()));
+		doSendEventAndConsumeAll(machine, MessageBuilder.withPayload(Events.A).setHeader("test", "exists").build());
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S3);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
+		assertThat(interceptor.postStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.postStateChangeCount2).isEqualTo(1);
+		assertThat(interceptor.preStateChangeStates2).hasSize(1);
+		assertThat(interceptor.postStateChangeStates2).hasSize(1);
+		assertThat(interceptor.preStateChangeStates2.get(0).getId()).isEqualTo(interceptor.postStateChangeStates2.get(0).getId());
 	}
 
 	@Test
 	public void testIntercept6() throws InterruptedException {
 		context.register(Config5.class);
 		context.refresh();
-		@SuppressWarnings("unchecked")
-		StateMachine<States, Events> machine = context.getBean(StateMachineSystemConstants.DEFAULT_ID_STATEMACHINE, StateMachine.class);
+		StateMachine<States, Events> machine = resolveMachine(context);
 		TestListener listener = new TestListener();
 		machine.addStateListener(listener);
 		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
 
-		machine.getStateMachineAccessor().doWithRegion(new StateMachineFunction<StateMachineAccess<States, Events>>() {
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
 
-			@Override
-			public void apply(StateMachineAccess<States, Events> function) {
-				function.addStateMachineInterceptor(interceptor);
-			}
-		});
-
-		machine.start();
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S0));
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.A);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S1));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S1);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
 
 		interceptor.reset(1);
 		listener.reset(1);
-		machine.sendEvent(Events.E);
-		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(listener.stateChangedCount, is(1));
-		assertThat(machine.getState().getIds(), containsInAnyOrder(States.S2));
-		assertThat(interceptor.preStateChangeLatch.await(2, TimeUnit.SECONDS), is(true));
-		assertThat(interceptor.preStateChangeCount, is(1));
+		doSendEventAndConsumeAll(machine, Events.E);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(1);
+	}
+
+	@Test
+	public void testIntercept7() throws InterruptedException {
+		context.register(Config6.class);
+		context.refresh();
+		StateMachine<States, Events> machine = resolveMachine(context);
+		TestListener listener = new TestListener();
+		machine.addStateListener(listener);
+		TestStateChangeInterceptor interceptor = new TestStateChangeInterceptor();
+
+		machine.getStateMachineAccessor().doWithRegion(function -> function.addStateMachineInterceptor(interceptor));
+
+		doStartAndAssert(machine);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(1);
+		assertThat(machine.getState().getIds()).containsOnly(States.S0);
+
+		interceptor.reset(2);
+		listener.reset(2);
+		doSendEventAndConsumeAll(machine, Events.A);
+		assertThat(listener.stateChangedLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(listener.stateChangedCount).isEqualTo(2);
+		assertThat(machine.getState().getIds()).containsOnly(States.S2);
+		assertThat(interceptor.preStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.preStateChangeCount2).isEqualTo(2);
+		assertThat(interceptor.postStateChangeLatch2.await(2, TimeUnit.SECONDS)).isTrue();
+		assertThat(interceptor.postStateChangeCount2).isEqualTo(2);
+
 	}
 
 	@Configuration
@@ -429,7 +423,11 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 					.and()
 				.withExternal()
 					.source(States.S1).target(States.S2)
-					.event(Events.B);
+					.event(Events.B)
+					.and()
+				.withExternal()
+					.source(States.S2).target(States.S0)
+					.event(Events.C);
 		}
 	}
 
@@ -525,6 +523,37 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 
 	}
 
+	@Configuration
+	@EnableStateMachine
+	static class Config6 extends EnumStateMachineConfigurerAdapter<States, Events> {
+
+		@Override
+		public void configure(StateMachineStateConfigurer<States, Events> states)
+				throws Exception {
+			states
+				.withStates()
+					.initial(States.S0)
+					.state(States.S1)
+					.state(States.S2);
+		}
+
+		@Override
+		public void configure(StateMachineTransitionConfigurer<States, Events> transitions)
+				throws Exception {
+			transitions
+				.withExternal()
+					.source(States.S0).target(States.S1)
+					.event(Events.A)
+					.and()
+				.withExternal()
+					.source(States.S1).target(States.S2)
+					.and()
+				.withExternal()
+					.source(States.S2).target(States.S0)
+					.event(Events.C);
+		}
+	}
+
 	public static enum States {
 		S0, S1, S11, S12, S2, S21, S211, S212, S3;
 	}
@@ -598,12 +627,12 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 
 	private static class TestStateChangeInterceptor implements StateMachineInterceptor<States, Events> {
 
-		volatile CountDownLatch preStateChangeLatch = new CountDownLatch(1);
-		volatile CountDownLatch postStateChangeLatch = new CountDownLatch(1);
-		volatile int preStateChangeCount = 0;
-		volatile int postStateChangeCount = 0;
-		ArrayList<State<States, Events>> preStateChangeStates = new ArrayList<>();
-		ArrayList<State<States, Events>> postStateChangeStates = new ArrayList<>();
+		volatile CountDownLatch preStateChangeLatch2 = new CountDownLatch(1);
+		volatile CountDownLatch postStateChangeLatch2 = new CountDownLatch(1);
+		volatile int preStateChangeCount2 = 0;
+		volatile int postStateChangeCount2 = 0;
+		ArrayList<State<States, Events>> preStateChangeStates2 = new ArrayList<>();
+		ArrayList<State<States, Events>> postStateChangeStates2 = new ArrayList<>();
 
 		@Override
 		public Message<Events> preEvent(Message<Events> message, StateMachine<States, Events> stateMachine) {
@@ -612,19 +641,20 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 
 		@Override
 		public void preStateChange(State<States, Events> state, Message<Events> message,
-				Transition<States, Events> transition, StateMachine<States, Events> stateMachine) {
-			preStateChangeStates.add(state);
-			preStateChangeCount++;
-			preStateChangeLatch.countDown();
-
+				Transition<States, Events> transition, StateMachine<States, Events> stateMachine,
+				StateMachine<States, Events> rootStateMachine) {
+			preStateChangeStates2.add(state);
+			preStateChangeCount2++;
+			preStateChangeLatch2.countDown();
 		}
 
 		@Override
 		public void postStateChange(State<States, Events> state, Message<Events> message,
-				Transition<States, Events> transition, StateMachine<States, Events> stateMachine) {
-			postStateChangeStates.add(state);
-			postStateChangeCount++;
-			postStateChangeLatch.countDown();
+				Transition<States, Events> transition, StateMachine<States, Events> stateMachine,
+				StateMachine<States, Events> rootStateMachine) {
+			postStateChangeStates2.add(state);
+			postStateChangeCount2++;
+			postStateChangeLatch2.countDown();
 		}
 
 		@Override
@@ -637,14 +667,13 @@ public class StateChangeInterceptorTests extends AbstractStateMachineTests {
 			return stateContext;
 		}
 
-
 		public void reset(int c1) {
-			preStateChangeLatch = new CountDownLatch(c1);
-			preStateChangeCount = 0;
-			postStateChangeLatch = new CountDownLatch(c1);
-			postStateChangeCount = 0;
-			preStateChangeStates.clear();
-			postStateChangeStates.clear();
+			preStateChangeLatch2 = new CountDownLatch(c1);
+			preStateChangeCount2 = 0;
+			postStateChangeLatch2 = new CountDownLatch(c1);
+			postStateChangeCount2 = 0;
+			preStateChangeStates2.clear();
+			postStateChangeStates2.clear();
 		}
 
 		@Override
